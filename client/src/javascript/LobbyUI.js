@@ -28,6 +28,18 @@ export default class LobbyUI
         this._restoreSavedUI()
         this._setupQuickPlay()
         this._setupNetworkEvents()
+
+        // Matchbox single-mode flow: skip the lobby UI entirely. Use defaults
+        // that EntryFlow stuffed into config (auto-generated name + random
+        // color + default car type) and submit immediately.
+        if(this.config.skipLobby)
+        {
+            this._name     = this.config.playerName || this._name || 'Driver'
+            this._colorIdx = this.config.carColor   ?? this._colorIdx ?? 0
+            this._carType  = this.config.carType    || this._carType  || 'default'
+            if(this.$lobby) this.$lobby.style.display = 'none'
+            this._submit()
+        }
     }
 
     _buildVehicleGrid()

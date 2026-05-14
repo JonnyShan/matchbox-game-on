@@ -1019,9 +1019,9 @@
         <span class="rl-conn-label">CONNECTING…</span>
     </div>
 
-    <!-- ── REDLINE: Title screen ── -->
-    <div id="redline-title" class="rl-overlay">
-        <!-- Synthwave atmosphere layers -->
+    <!-- ── MATCHBOX: Title screen ── -->
+    <div id="redline-title" class="rl-overlay mb-title">
+        <!-- Meadow atmosphere layers -->
         <div class="rl-grid-floor" aria-hidden="true"></div>
         <div class="rl-speed-lines" aria-hidden="true">
             <div class="rl-speed-line"></div>
@@ -1029,20 +1029,20 @@
             <div class="rl-speed-line"></div>
             <div class="rl-speed-line"></div>
         </div>
-        <div class="rl-scanlines" aria-hidden="true"></div>
 
-        <div class="rl-version">0.1.0</div>
         <div class="rl-title-content">
-            <h1 class="rl-wordmark">REDLINE</h1>
-            <div class="rl-slash" aria-hidden="true"></div>
-            <p class="rl-tagline">Race clean. Or <em>wreck everything</em>.</p>
-            <div class="rl-mode-pills" aria-hidden="true">
-                <span class="rl-pill" data-mode="race">🏁 RACE</span>
-                <span class="rl-pill rl-pill-divider"></span>
-                <span class="rl-pill" data-mode="combat">💥 COMBAT</span>
+            <div class="mb-logo">
+                <span class="mb-logo-pill">MATCHBOX</span>
+                <span class="mb-logo-sub">COLLECT</span>
+            </div>
+            <p class="rl-tagline">Ten cars. Sixty seconds. <em>Collect them all.</em></p>
+            <div class="mb-stats" aria-hidden="true">
+                <span><strong>10</strong> CARS</span>
+                <span class="mb-stat-divider"></span>
+                <span><strong>60</strong> SECONDS</span>
             </div>
         </div>
-        <div class="rl-prompt">PRESS ANY KEY</div>
+        <div class="rl-prompt">PRESS ANY KEY TO START</div>
     </div>
 
     <!-- ── REDLINE: Main menu ── -->
@@ -1072,28 +1072,12 @@
                     </div>
                 </button>
 
-                <button class="rl-card" data-mode="combat" type="button" role="listitem">
-                    <div class="rl-card-icon" aria-hidden="true">💥</div>
-                    <div class="rl-card-label">Mode 02</div>
-                    <div class="rl-card-name">COMBAT</div>
-                    <div class="rl-card-desc">Five kills. Last car running. Missiles, pickups, debris, mayhem.</div>
-                    <div class="rl-card-stats"><span>5</span><em>·</em><span>KILLS</span><em>·</em><span>FREE-FOR-ALL</span></div>
-                    <div class="rl-card-cta">
-                        <span>Enter</span>
-                        <span class="rl-card-cta-arrow" aria-hidden="true">→</span>
-                    </div>
-                </button>
-
-                <button class="rl-card" data-mode="collect" type="button" role="listitem" style="border-color:#d83a2f;">
+                <!-- Single-mode Matchbox build: menu hidden in EntryFlow.
+                     Markup retained only because Application._setupConnectionStatus
+                     queries for `.rl-card` selectors. -->
+                <button class="rl-card" data-mode="collect" type="button" role="listitem" style="display:none">
                     <div class="rl-card-icon" aria-hidden="true">🚗</div>
-                    <div class="rl-card-label">Mode 03 · <span style="color:#f0c14b;font-weight:700">MATCHBOX</span></div>
                     <div class="rl-card-name">COLLECT</div>
-                    <div class="rl-card-desc">Ten Matchbox cars. Sixty seconds. Grab them all before the timer runs out.</div>
-                    <div class="rl-card-stats"><span>10</span><em>·</em><span>CARS</span><em>·</em><span>60s</span></div>
-                    <div class="rl-card-cta">
-                        <span>Enter</span>
-                        <span class="rl-card-cta-arrow" aria-hidden="true">→</span>
-                    </div>
                 </button>
 
             </div>
