@@ -16,8 +16,17 @@ const MODE_DATA = {
         icon:       '💥',
         accent:     'var(--rl-redline)',
         objective:  'First driver to <em>5 kills</em> wins. Stay alive, hunt rivals.',
-        controls:   '<kbd>WASD</kbd> drive · <kbd>SHIFT</kbd> boost · <kbd>X</kbd> brake · <kbd>SPACE</kbd> jump · <kbd>F</kbd> fire · <kbd>R</kbd> respawn',
-        tips:       'Grab ammo crates and health crystals. Missiles home toward enemies. <em>Watch for meteor markers</em> on the ground — dodge or take 32 HP.',
+        controls:   '<kbd>WASD</kbd> drive · <kbd>SHIFT</kbd> boost · <kbd>X</kbd> brake · <kbd>SPACE</kbd> jump · <kbd>F</kbd> fire · <kbd>B</kbd> mine · <kbd>R</kbd> respawn',
+        tips:       'Grab ammo crates and health crystals. Missiles home toward enemies. <em>Watch for meteor markers</em> on the ground.',
+    },
+    collect: {
+        num:        '03',
+        name:       'MATCHBOX COLLECT',
+        icon:       '🚗',
+        accent:     '#d83a2f',
+        objective:  'Grab <em>10 Matchbox cars</em> in <em>60 seconds</em>. Whoever collects them all first wins. Tie at zero? Highest count takes the trophy.',
+        controls:   '<kbd>WASD</kbd> drive · <kbd>SHIFT</kbd> boost · <kbd>X</kbd> brake · <kbd>SPACE</kbd> jump · <kbd>R</kbd> reset',
+        tips:       'Boxes float gold over key zones — plateau, bowl, stairs deck, kicker, spine. Boost between corridors. <em>No weapons in this mode.</em>',
     },
 }
 
@@ -80,12 +89,7 @@ export default class EntryFlow
         if(this._screen !== 'title') return
         document.removeEventListener('keydown', this._titleHandler)
         this.$title.removeEventListener('click', this._titleClickHandler)
-
-        // SHORTCUT: With Race hidden, Combat is the only mode — skip the
-        // menu and onboarding entirely. Title press-key goes straight
-        // into the game, only the lobby (name/color/car) stands between.
-        this._currentMode = 'combat'
-        this._screen      = 'transitioning'
+        this._screen = 'transitioning'
 
         const wordmark = this.$title.querySelector('.rl-wordmark')
         const tagline  = this.$title.querySelector('.rl-tagline')
@@ -94,10 +98,7 @@ export default class EntryFlow
             onComplete: () =>
             {
                 this.$title.classList.remove('is-active')
-                this.$grain?.classList.add('hidden')
-                this.config.gameMode = 'combat'
-                this.config.soloMode = false
-                this.onComplete?.()
+                this._showMenu()
             },
         })
         .to([wordmark, tagline, '.rl-slash', '.rl-prompt', '.rl-mode-pills'], {

@@ -4,6 +4,7 @@ import { HealthSystem } from './HealthSystem.js'
 import { CombatRules } from './CombatRules.js'
 import { MinesSystem } from './MinesSystem.js'
 import { ChatRateLimiter } from './ChatRateLimiter.js'
+import { CollectManager } from './CollectManager.js'
 import {
   sanitizeName,
   sanitizeCarColor,
@@ -22,10 +23,11 @@ export class GameRoom {
     this.physics = new PhysicsWorld()
     this.players = new Map() // socketId → { id, name, carColor, carType, actions, spawnXY, clientSnapshot, kills }
 
-    this.health = new HealthSystem()
-    this.combat = new CombatRules()
-    this.mines  = new MinesSystem()
-    this.chat   = new ChatRateLimiter()
+    this.health  = new HealthSystem()
+    this.combat  = new CombatRules()
+    this.mines   = new MinesSystem()
+    this.chat    = new ChatRateLimiter()
+    this.collect = new CollectManager()
     this._pendingMeteors = []   // [{ x, y, impactAt }]
 
     this._startLoop()
@@ -73,20 +75,30 @@ export class GameRoom {
         const name     = sanitizeName(rawPayload?.name)
         const carColor = sanitizeCarColor(rawPayload?.carColor)
         const carType  = sanitizeCarType(rawPayload?.carType)
+        // Mode is whitelisted: 'race' | 'combat' | 'collect'
+        const rawMode  = rawPayload?.mode
+        const mode     = (rawMode === 'race' || rawMode === 'combat' || rawMode === 'collect') ? rawMode : 'combat'
 
         const spawnPos = this._getSpawnPosition()
         this.physics.addCar(socket.id, spawnPos)
         this.health.addPlayer(socket.id, carType)
+        if (mode === 'collect') this.collect.addPlayer(socket.id)
 
         this.players.set(socket.id, {
           id:       socket.id,
           name,
           carColor,
           carType,
+          mode,
           actions:  { up: false, down: false, left: false, right: false, brake: false, boost: false },
           spawnXY:  { x: spawnPos.x, y: spawnPos.y },
           kills:    0,
         })
+
+        // Start collect match if at least one player is in collect mode and no match running
+        if (mode === 'collect' && !this.collect.isRunning()) {
+          this.collect.startMatch()
+        }
 
         // Send existing players to new joiner (with their types so they get correct stats locally)
         const existingPlayers = [...this.players.values()]
@@ -99,6 +111,8 @@ export class GameRoom {
           spawnPos: { x: spawnPos.x, y: spawnPos.y },
           maxHp: this.health.getMaxHp(socket.id),
           invulnMs: COMBAT.spawnInvulnMs,
+          mode,
+          collectState: mode === 'collect' ? this.collect.getStateSnapshot() : null,
         })
 
         // Notify everyone else
@@ -214,6 +228,7 @@ export class GameRoom {
         this.combat.removeOwner(socket.id)
         this.mines.removeOwner(socket.id)
         this.chat.removeOwner(socket.id)
+        this.collect.removePlayer(socket.id)
         const player = this.players.get(socket.id)
         this.players.delete(socket.id)
         this.io.emit('player:left', { id: socket.id })
@@ -312,6 +327,39 @@ export class GameRoom {
     }
     for (const m of mineExpired) {
       this.io.emit('combat:mineExpired', { mineId: m.id, fromId: m.ownerId })
+    }
+
+    // ── Collect mode tick ──
+    if (this.collect.isRunning(now) || this.collect._matchStartAt) {
+      const { collected, finished, reason } = this.collect.tick(now, carPositions)
+      for (const c of collected) {
+        const player = this.players.get(c.byId)
+        this.io.emit('collect:pickup', {
+          idx:       c.idx,
+          x:         c.x,
+          y:         c.y,
+          z:         c.z,
+          model:     c.model,
+          byId:      c.byId,
+          byName:    player?.name ?? '???',
+          score:     c.score,
+          completed: c.completed,
+        })
+      }
+      if (finished) {
+        const winner = this.players.get(finished)
+        this.io.emit('collect:finished', {
+          winnerId:   finished,
+          winnerName: winner?.name ?? '???',
+          reason,
+          scores:     [...this.collect._scores.entries()].map(([id, s]) => ({
+            id,
+            name:     this.players.get(id)?.name ?? '???',
+            count:    s.count,
+            finishAt: s.finishAt,
+          })),
+        })
+      }
     }
 
     // ── Respawns ──

@@ -30,6 +30,7 @@ import Meteors from './Meteors.js'
 import Mines from './Mines.js'
 import Killfeed from './Killfeed.js'
 import DamageNumbers from './DamageNumbers.js'
+import CollectPickups from './CollectPickups.js'
 import { CAR_COLORS } from '../../../../shared/constants.js'
 
 function escapeHtml(s)
@@ -89,19 +90,20 @@ export default class World
     {
         window.setTimeout(() => { this.camera.pan.enable() }, 2000)
 
-        // Mode flags — only 'race' and 'combat' supported
-        const mode   = this.config.gameMode || 'race'
-        const race   = mode === 'race'
-        const combat = mode === 'combat'
+        // Mode flags — 'race' | 'combat' | 'collect'
+        const mode    = this.config.gameMode || 'race'
+        const race    = mode === 'race'
+        const combat  = mode === 'combat'
+        const collect = mode === 'collect'
 
         this.setReveal()
         this.setMaterials()
         this.setShadows()
         this.setPhysics()
 
-        // Race uses the racetrack; Combat uses the dedicated arena
-        if(combat) this.setArena()
-        else       this.setTrack()
+        // Race uses the racetrack; Combat + Collect use the dedicated arena
+        if(combat || collect) this.setArena()
+        else                  this.setTrack()
 
         if(this.network) this._setupSnapshotSender()
         if(this.network) this._setupBumpHandling()
@@ -141,6 +143,195 @@ export default class World
             this.setCombat()
             this._setupCombatEnd()
         }
+
+        if(collect)
+        {
+            this.setCollect()
+        }
+    }
+
+    setCollect()
+    {
+        // Use server's pickup layout from room:joined
+        this.collectPickups = new CollectPickups({
+            scene:   this.scene,
+            network: this.network,
+        })
+
+        // Pull initial state and spawn pickups
+        const onState = (data) =>
+        {
+            const state = data.collectState
+            if(state) this.collectPickups.spawnFromState(state)
+            if(state?.matchEndAt) this._collectMatchEnd = state.matchEndAt
+        }
+        if(this._joinSnapshot) onState(this._joinSnapshot)
+        else if(this.network) this.network.on('room:joined', onState)
+
+        // HUD elements
+        this._buildCollectHUD()
+
+        // Track my collected count for HUD
+        this._myCollects = 0
+        if(this.network)
+        {
+            this.network.on('collect:pickup', ({ byId, score, completed, byName }) =>
+            {
+                if(byId === this.network.localId)
+                {
+                    this._myCollects = score
+                    this._flashCollect('+1', '#f0c14b')
+                }
+                else
+                {
+                    this._flashCollect(`${byName} grabbed one`, '#9e9e9e')
+                }
+                this._updateCollectHUD()
+            })
+
+            this.network.on('collect:finished', ({ winnerId, winnerName, reason, scores }) =>
+            {
+                this._showCollectComplete({
+                    youWon:  winnerId === this.network.localId,
+                    winner:  winnerName,
+                    reason,
+                    scores,
+                })
+            })
+        }
+
+        // Tick updates
+        this.time.on('tick', () =>
+        {
+            const dt = Math.min(this.time.delta, 60)
+            this.collectPickups.update(dt)
+            this._updateCollectTimer()
+        })
+    }
+
+    _buildCollectHUD()
+    {
+        const $hud = document.createElement('div')
+        $hud.id = 'collect-hud'
+        $hud.style.cssText = `
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 8px 18px;
+            font-family: 'Space Grotesk', monospace;
+            background: linear-gradient(180deg, #d83a2f 0%, #b02a22 100%);
+            color: #f7ecd2;
+            border: 2px solid #f0c14b;
+            border-radius: 8px;
+            z-index: 600;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+            letter-spacing: 1px;
+        `
+        $hud.innerHTML = `
+            <span style="font-size:10px;font-weight:700;letter-spacing:3px;opacity:0.85">MATCHBOX</span>
+            <span id="collect-timer" style="font-size:24px;font-weight:900;min-width:60px;text-align:center">1:00</span>
+            <span style="font-size:22px;font-weight:900">·</span>
+            <span id="collect-count" style="font-size:18px;font-weight:700;letter-spacing:1px">0 / 10</span>
+        `
+        document.body.appendChild($hud)
+        this._$collectHud = $hud
+
+        const $flash = document.createElement('div')
+        $flash.id = 'collect-flash'
+        $flash.style.cssText = `
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Space Grotesk', monospace;
+            font-weight: 900;
+            font-size: 28px;
+            color: #f0c14b;
+            text-shadow: 0 0 16px rgba(240,193,75,0.7), 0 2px 4px rgba(0,0,0,0.6);
+            z-index: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+        `
+        document.body.appendChild($flash)
+        this._$collectFlash = $flash
+    }
+
+    _flashCollect(text, color)
+    {
+        if(!this._$collectFlash) return
+        this._$collectFlash.textContent = text
+        this._$collectFlash.style.color = color
+        this._$collectFlash.style.opacity = '1'
+        this._$collectFlash.style.transform = 'translateX(-50%) translateY(0)'
+        clearTimeout(this._collectFlashTimer)
+        this._collectFlashTimer = setTimeout(() =>
+        {
+            this._$collectFlash.style.opacity = '0'
+            this._$collectFlash.style.transform = 'translateX(-50%) translateY(-12px)'
+        }, 1200)
+    }
+
+    _updateCollectHUD()
+    {
+        const $c = document.getElementById('collect-count')
+        if($c) $c.textContent = `${this._myCollects} / 10`
+    }
+
+    _updateCollectTimer()
+    {
+        if(!this._collectMatchEnd) return
+        const ms = Math.max(0, this._collectMatchEnd - Date.now() - (this.network?.serverTimeOffset || 0))
+        const s  = Math.floor(ms / 1000)
+        const $t = document.getElementById('collect-timer')
+        if($t)
+        {
+            const mm = Math.floor(s / 60)
+            const ss = String(s % 60).padStart(2, '0')
+            $t.textContent = `${mm}:${ss}`
+            if(s <= 10) $t.style.color = '#ffe066'
+        }
+    }
+
+    _showCollectComplete({ youWon, winner, reason, scores })
+    {
+        const $overlay = document.getElementById('race-complete')
+        if(!$overlay) return
+
+        const $trophy = $overlay.querySelector('.rc-trophy')
+        const $title  = $overlay.querySelector('.rc-title')
+        const $sub    = document.getElementById('rc-sub')
+        const $list   = document.getElementById('rc-laps')
+        const $footer = document.getElementById('rc-footer')
+
+        if($trophy) $trophy.textContent = youWon ? '🏆' : '🎁'
+        if($title)  $title.textContent  = youWon ? 'COLLECTOR' : `${winner} WINS`
+        if($sub)    $sub.textContent    = reason === 'timer' ? 'Time expired' : 'All 10 collected'
+        if($list)
+        {
+            $list.innerHTML = ''
+            const sorted = [...scores].sort((a, b) => b.count - a.count)
+            sorted.forEach(s =>
+            {
+                const li = document.createElement('li')
+                li.className = 'rc-lap-row'
+                if(s.count >= 10) li.classList.add('rc-lap-best')
+                const num  = document.createElement('span'); num.className = 'rc-lap-num'; num.textContent = s.name
+                const time = document.createElement('span'); time.className = 'rc-lap-time'; time.textContent = `${s.count} / 10`
+                li.appendChild(num); li.appendChild(time)
+                $list.appendChild(li)
+            })
+        }
+        if($footer) $footer.textContent = 'MATCHBOX × REDLINE'
+
+        const $again = document.getElementById('rc-again')
+        if($again) $again.onclick = () => window.location.reload()
+
+        $overlay.classList.add('visible')
     }
 
     setReveal()
@@ -470,9 +661,11 @@ export default class World
         this.controls.network = this.network
 
         this._serverSpawnPos = null
-        this.network.on('room:joined', ({ spawnPos }) =>
+        this.network.on('room:joined', (data) =>
         {
-            this._serverSpawnPos = spawnPos
+            this._serverSpawnPos = data.spawnPos
+            this._joinSnapshot   = data        // includes collectState for collect mode
+            if(data.collectState?.matchEndAt) this._collectMatchEnd = data.collectState.matchEndAt
             this._playerJoined = true
             this._tryStart?.()
         })

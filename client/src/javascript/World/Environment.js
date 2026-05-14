@@ -38,8 +38,8 @@ export default class Environment
             this._buildCurbs()
         }
 
-        // Atmospheric dark-blue background instead of pure black
-        this.renderer.setClearColor(0x080c12, 1)
+        // Daytime meadow background — soft sky horizon
+        this.renderer.setClearColor(0x9ec9e8, 1)
     }
 
     // ── Material helpers ─────────────────────────────────────────────────────
@@ -99,12 +99,18 @@ export default class Environment
         for(let i = 0; i < pos.count; i++)
         {
             const t = THREE.MathUtils.clamp((pos.getZ(i) + 80) / 180, 0, 1)
-            // Horizon: dark teal-blue  /  Zenith: near-black
-            col.push(
-                THREE.MathUtils.lerp(0.055, 0.01, t),
-                THREE.MathUtils.lerp(0.09,  0.02, t),
-                THREE.MathUtils.lerp(0.20,  0.04, t),
-            )
+            // Horizon: pale warm haze  /  Mid: sky blue  /  Zenith: deep cyan-blue
+            // Three-stop gradient for a more believable daytime sky.
+            const r = t < 0.5
+                ? THREE.MathUtils.lerp(0.95, 0.55, t * 2)   // horizon → mid
+                : THREE.MathUtils.lerp(0.55, 0.30, (t - 0.5) * 2)  // mid → zenith
+            const g = t < 0.5
+                ? THREE.MathUtils.lerp(0.85, 0.72, t * 2)
+                : THREE.MathUtils.lerp(0.72, 0.50, (t - 0.5) * 2)
+            const b = t < 0.5
+                ? THREE.MathUtils.lerp(0.78, 0.88, t * 2)
+                : THREE.MathUtils.lerp(0.88, 0.74, (t - 0.5) * 2)
+            col.push(r, g, b)
         }
         geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
 

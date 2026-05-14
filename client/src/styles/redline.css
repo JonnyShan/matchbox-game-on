@@ -2,23 +2,23 @@
    REDLINE — Entry flow styles (Title, Menu, Onboarding, Loading, Lobby)
    ───────────────────────────────────────────────────────────────────────── */
 
-/* ── Design tokens ─────────────────────────────────────────────────────── */
+/* ── Design tokens — natural/outdoor palette ───────────────────────────── */
 :root {
-    /* Surfaces */
-    --rl-bg-deep:        #08080F;
-    --rl-bg-surface:     #1A1A2D;
-    --rl-bg-elevated:    #25253D;
-    --rl-border:         #3A3A55;
+    /* Surfaces — deep forest greens replacing near-black neon stack */
+    --rl-bg-deep:        #1a2a14;   /* deep moss */
+    --rl-bg-surface:     #243d24;   /* forest floor */
+    --rl-bg-elevated:    #2f4d2c;   /* sunlit moss */
+    --rl-border:         #3d5d38;   /* fern stem */
 
-    /* Accents */
-    --rl-redline:        #FF2E4D;
-    --rl-cyan:           #00E5FF;
-    --rl-amber:          #FFB627;
+    /* Accents — green primary, sky-blue secondary, golden-hour tertiary */
+    --rl-redline:        #5fa83f;   /* leaf green (was magenta — name kept for compat) */
+    --rl-cyan:           #8fd3ff;   /* sky blue */
+    --rl-amber:          #f0c14b;   /* daffodil — already warm, light tweak */
 
-    /* Text */
-    --rl-text:           #F5F5FA;
-    --rl-text-2:         #9999B0;
-    --rl-text-dim:       #5A5A75;
+    /* Text — kept warm/cream for legibility on green */
+    --rl-text:           #f7f5e8;
+    --rl-text-2:         #b8c2a8;
+    --rl-text-dim:       #6e7a64;
 
     /* Typography */
     --rl-font-display:   "Space Grotesk", sans-serif;
@@ -142,88 +142,80 @@
     padding: var(--rl-8);
 }
 
-/* Synthwave perspective grid floor at the bottom */
+/* Meadow horizon — soft warm haze at the bottom replaces synthwave grid */
 .rl-grid-floor {
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 45vh;
+    height: 55vh;
     pointer-events: none;
     z-index: 0;
-    perspective: 380px;
-    perspective-origin: 50% 100%;
-    -webkit-mask-image: linear-gradient(to top, black 25%, transparent 95%);
-            mask-image: linear-gradient(to top, black 25%, transparent 95%);
+    background:
+        radial-gradient(ellipse 120% 80% at 50% 100%,
+            rgba(95, 168, 63, 0.45) 0%,
+            rgba(95, 168, 63, 0.18) 40%,
+            transparent 80%);
 }
 
+/* Distant tree silhouette band — repeating triangle gradient */
 .rl-grid-floor::before {
     content: '';
     position: absolute;
-    bottom: -10%;
-    left: -50%;
-    width: 200%;
-    height: 110%;
-    transform: rotateX(72deg);
-    transform-origin: center bottom;
+    bottom: 30%;
+    left: 0;
+    width: 100%;
+    height: 14%;
     background-image:
-        linear-gradient(rgba(255, 46, 77, 0.45) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 46, 77, 0.45) 1px, transparent 1px);
-    background-size: 60px 60px;
-    background-position: center bottom;
-    animation: rl-grid-scroll 6s linear infinite;
+        linear-gradient(135deg, transparent 49%, rgba(35, 70, 30, 0.85) 50%, transparent 51%),
+        linear-gradient( 45deg, transparent 49%, rgba(35, 70, 30, 0.85) 50%, transparent 51%);
+    background-size: 64px 100%, 64px 100%;
+    background-position: 0 100%, 32px 100%;
+    background-repeat: repeat-x;
+    -webkit-mask-image: linear-gradient(to top, black 40%, transparent 100%);
+            mask-image: linear-gradient(to top, black 40%, transparent 100%);
+    opacity: 0.7;
 }
 
-@keyframes rl-grid-scroll {
-    from { background-position: 0 0; }
-    to   { background-position: 0 60px; }
-}
-
-/* Horizontal speed lines that drift across the screen */
+/* Drifting pollen — was horizontal speed lines */
 .rl-speed-lines {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 0;
     overflow: hidden;
-    -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, black 80%);
-            mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, transparent 30%, black 80%);
 }
 
 .rl-speed-line {
     position: absolute;
-    height: 1px;
-    width: 200%;
-    background: linear-gradient(90deg, transparent 0%, rgba(255, 46, 77, 0.6) 50%, transparent 100%);
-    left: -100%;
-    animation: rl-speed 2.4s linear infinite;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 235, 140, 0.9) 0%, rgba(255, 235, 140, 0) 70%);
+    opacity: 0;
+    animation: rl-pollen 14s linear infinite;
 }
 
-.rl-speed-line:nth-child(1) { top: 18%; animation-duration: 3.6s; opacity: 0.5; }
-.rl-speed-line:nth-child(2) { top: 32%; animation-duration: 2.4s; animation-delay: -1.2s; opacity: 0.7; }
-.rl-speed-line:nth-child(3) { top: 64%; animation-duration: 3.0s; animation-delay: -0.6s; opacity: 0.4; }
-.rl-speed-line:nth-child(4) { top: 78%; animation-duration: 4.2s; animation-delay: -2.0s; opacity: 0.6; }
+.rl-speed-line:nth-child(1) { left: 12%; animation-duration: 18s; animation-delay:   0s; }
+.rl-speed-line:nth-child(2) { left: 38%; animation-duration: 12s; animation-delay:  -4s; }
+.rl-speed-line:nth-child(3) { left: 62%; animation-duration: 16s; animation-delay:  -2s; }
+.rl-speed-line:nth-child(4) { left: 86%; animation-duration: 14s; animation-delay:  -8s; }
 
-@keyframes rl-speed {
-    from { transform: translateX(0); }
-    to   { transform: translateX(50%); }
+@keyframes rl-pollen {
+    0%   { transform: translateY(110vh) translateX(0);  opacity: 0; }
+    10%  { opacity: 0.85; }
+    50%  { transform: translateY(50vh)  translateX(20px); }
+    90%  { opacity: 0.5; }
+    100% { transform: translateY(-10vh) translateX(-20px); opacity: 0; }
 }
 
-/* CRT-style scanlines (very subtle) */
+/* Scanlines disabled — no CRT in nature. Kept selector for compat. */
 .rl-scanlines {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    background: repeating-linear-gradient(
-        0deg,
-        transparent 0,
-        transparent 2px,
-        rgba(0, 0, 0, 0.06) 2px,
-        rgba(0, 0, 0, 0.06) 3px
-    );
-    -webkit-mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
-            mask-image: radial-gradient(ellipse at center, black 50%, transparent 100%);
+    display: none;
 }
 
 .rl-title-content {

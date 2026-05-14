@@ -136,13 +136,14 @@ export default class Application
         this.passes.verticalBlurPass.material.uniforms.uResolution.value = new THREE.Vector2(this.sizes.viewport.width, this.sizes.viewport.height)
         this.passes.verticalBlurPass.material.uniforms.uStrength.value   = new THREE.Vector2(0, this.passes.verticalBlurPass.strength)
 
+        // Warm sunlight haze instead of pink synthwave bloom
         this.passes.glowsPass = new ShaderPass(GlowsPass)
-        this.passes.glowsPass.color = '#ffcfe0'
-        this.passes.glowsPass.material.uniforms.uPosition.value = new THREE.Vector2(0, 0.25)
-        this.passes.glowsPass.material.uniforms.uRadius.value   = 0.7
+        this.passes.glowsPass.color = '#fff5c2'
+        this.passes.glowsPass.material.uniforms.uPosition.value = new THREE.Vector2(0.25, 0.65)   // sun upper-left
+        this.passes.glowsPass.material.uniforms.uRadius.value   = 0.85
         this.passes.glowsPass.material.uniforms.uColor.value    = new THREE.Color(this.passes.glowsPass.color)
         this.passes.glowsPass.material.uniforms.uColor.value.convertLinearToSRGB()
-        this.passes.glowsPass.material.uniforms.uAlpha.value    = 0.55
+        this.passes.glowsPass.material.uniforms.uAlpha.value    = 0.35
 
         this.passes.composer.addPass(this.passes.renderPass)
         this.passes.composer.addPass(this.passes.horizontalBlurPass)

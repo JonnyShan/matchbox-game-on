@@ -136,6 +136,17 @@ export default class Network extends EventEmitter
             this.trigger('combat:meteor', [data])
         })
 
+        // ── Matchbox COLLECT mode events ──
+        this.socket.on('collect:pickup', (data) =>
+        {
+            this.trigger('collect:pickup', [data])
+        })
+
+        this.socket.on('collect:finished', (data) =>
+        {
+            this.trigger('collect:finished', [data])
+        })
+
         // Latency + clock-sync
         this._pingInterval = setInterval(() =>
         {
@@ -160,11 +171,11 @@ export default class Network extends EventEmitter
         }, 1500)
     }
 
-    join(name, carColor, carType = 'default')
+    join(name, carColor, carType = 'default', mode = 'combat')
     {
         this.localPlayerName = name
         this._wasJoined        = true
-        this._lastJoinPayload  = { name, carColor, carType }
+        this._lastJoinPayload  = { name, carColor, carType, mode }
         this.socket.emit('player:join', this._lastJoinPayload)
     }
 

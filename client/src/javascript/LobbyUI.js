@@ -227,7 +227,7 @@ export default class LobbyUI
 
         if(this.network)
         {
-            this.network.join(this._name, this._colorIdx, this._carType)
+            this.network.join(this._name, this._colorIdx, this._carType, this.config.gameMode || 'combat')
         }
         else
         {

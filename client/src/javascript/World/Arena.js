@@ -4,8 +4,8 @@ import MatcapMaterial from '../Materials/Matcap.js'
 
 // ── Procedural textures ─────────────────────────────────────────────────────
 
-// Synthwave-style floor: dim red grid on near-black background.
-// Bright lines at the tile edges (every 4m), dim quarter lines (every 1m).
+// Procedural grass floor: layered green noise with sparse dirt patches.
+// Tiles seamlessly — no grid lines, no neon.
 function makeSynthwaveFloorTex()
 {
     const SZ = 256
@@ -13,23 +13,43 @@ function makeSynthwaveFloorTex()
     c.width = c.height = SZ
     const ctx = c.getContext('2d')
 
-    ctx.fillStyle = '#0a0a14'
+    // Base grass
+    ctx.fillStyle = '#3d6b2a'
     ctx.fillRect(0, 0, SZ, SZ)
 
-    // Dim quarter grid
-    ctx.strokeStyle = 'rgba(255, 46, 77, 0.10)'
-    ctx.lineWidth = 1
-    for(let f = 0.25; f < 1; f += 0.25)
+    // Soft dirt patches via radial gradients (4 random per tile)
+    for(let i = 0; i < 4; i++)
     {
-        const i = Math.round(f * SZ) + 0.5
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, SZ); ctx.stroke()
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(SZ, i); ctx.stroke()
+        const x = Math.random() * SZ
+        const y = Math.random() * SZ
+        const r = 18 + Math.random() * 26
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+        g.addColorStop(0, 'rgba(86, 62, 38, 0.55)')
+        g.addColorStop(1, 'rgba(86, 62, 38, 0)')
+        ctx.fillStyle = g
+        ctx.fillRect(0, 0, SZ, SZ)
     }
 
-    // Bright tile edges
-    ctx.strokeStyle = 'rgba(255, 46, 77, 0.55)'
-    ctx.lineWidth = 2
-    ctx.strokeRect(1, 1, SZ - 2, SZ - 2)
+    // Grass blade speckles — dark shadow + mid + light highlight
+    for(let i = 0; i < 1200; i++)
+    {
+        const x = Math.random() * SZ
+        const y = Math.random() * SZ
+        const r = Math.random()
+        if(r < 0.45)      ctx.fillStyle = '#2e5520'
+        else if(r < 0.85) ctx.fillStyle = '#5a8a3e'
+        else              ctx.fillStyle = '#7aae50'
+        ctx.fillRect(x, y, 2, 1 + Math.random() * 2)
+    }
+
+    // Tiny scattered flowers — daffodil + white
+    for(let i = 0; i < 30; i++)
+    {
+        const x = Math.random() * SZ
+        const y = Math.random() * SZ
+        ctx.fillStyle = Math.random() > 0.5 ? '#f0c14b' : '#ffffff'
+        ctx.fillRect(x, y, 2, 2)
+    }
 
     return new THREE.CanvasTexture(c)
 }
@@ -43,7 +63,7 @@ function makeLogoTex()
     const ctx = c.getContext('2d')
 
     // Transparent — only fillText
-    ctx.fillStyle = 'rgba(255, 46, 77, 0.55)'
+    ctx.fillStyle = 'rgba(95, 168, 63, 0.55)'
     ctx.font = '700 200px "Space Grotesk", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -51,9 +71,9 @@ function makeLogoTex()
 
     // Subtle glow underline
     const g = ctx.createLinearGradient(140, 220, 884, 220)
-    g.addColorStop(0,    'rgba(255, 46, 77, 0)')
-    g.addColorStop(0.5,  'rgba(255, 46, 77, 0.7)')
-    g.addColorStop(1,    'rgba(255, 46, 77, 0)')
+    g.addColorStop(0,    'rgba(95, 168, 63, 0)')
+    g.addColorStop(0.5,  'rgba(95, 168, 63, 0.7)')
+    g.addColorStop(1,    'rgba(95, 168, 63, 0)')
     ctx.strokeStyle = g
     ctx.lineWidth = 3
     ctx.beginPath(); ctx.moveTo(140, 230); ctx.lineTo(884, 230); ctx.stroke()
@@ -140,7 +160,7 @@ const SHADE_UNIFORMS = {
     uIndirectAngleStrength:     1.5,
     uIndirectAngleOffset:       0.6,
     uIndirectAnglePower:        1.0,
-    uIndirectColor:             new THREE.Color('#d04500'),
+    uIndirectColor:             new THREE.Color('#7aae50'),
 }
 
 export default class Arena
@@ -154,8 +174,10 @@ export default class Arena
         this.container = new THREE.Object3D()
         this.container.matrixAutoUpdate = false
 
+        // Natural reskin: walls = warm stone/wood (use white matcap),
+        // accent = leaf-green via emerald matcap, metal stays for posts.
         this._matWall    = this._makeMatcap('matcapWhiteTexture')
-        this._matAccent  = this._makeMatcap('matcapRedTexture')
+        this._matAccent  = this._makeMatcap('matcapEmeraldGreenTexture') ?? this._makeMatcap('matcapRedTexture')
         this._matMetal   = this._makeMatcap('matcapMetalTexture') ?? this._matWall
 
         this.size       = SIZE
@@ -456,7 +478,7 @@ export default class Arena
         // Hex ring around the central plateau
         const hexGeo = new THREE.RingGeometry(11.5, 12.0, 6)
         const hexMat = new THREE.MeshBasicMaterial({
-            color: 0xff2e4d, transparent: true, opacity: 0.32, side: THREE.DoubleSide,
+            color: 0x5fa83f, transparent: true, opacity: 0.28, side: THREE.DoubleSide,
         })
         const hex = new THREE.Mesh(hexGeo, hexMat)
         hex.position.z = SURFACE_Z

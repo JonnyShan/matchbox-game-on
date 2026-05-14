@@ -129,6 +129,30 @@ export const COMBAT = {
   },
 }
 
+// ── Matchbox COLLECT mode tuning ────────────────────────────────────────────
+// Player drives the arena and picks up 10 Matchbox cars before the timer
+// expires. Server is authoritative for pickup state, score, and timer.
+export const COLLECT = {
+  durationMs:       60_000,   // 60s match
+  targetCount:      10,
+  pickupRadius:     2.6,      // m — proximity for auto-collect
+  pickupHeightZ:    1.0,      // float a meter above ground
+  // 10 fixed positions inside the 100×100 arena. Spread across cardinal
+  // quadrants + plateau + ramps to force movement.
+  positions: [
+    { x:   0, y:   0, z: 2.6, model: 'pickup'   },  // plateau apex (highest value visually)
+    { x:  28, y:  28, z: 1.3, model: 'sedan'    },  // NE bowl
+    { x: -28, y:  35, z: 3.4, model: 'sports'   },  // NW stairs deck top
+    { x:  28, y: -36, z: 1.3, model: 'truck'    },  // SE kicker landing
+    { x: -28, y: -28, z: 2.9, model: 'pickup'   },  // SW spine
+    { x:   0, y:  35, z: 1.0, model: 'sedan'    },  // N corridor
+    { x:  35, y:   0, z: 1.0, model: 'sports'   },  // E corridor
+    { x: -35, y:   0, z: 1.0, model: 'pickup'   },  // W corridor
+    { x:  14, y: -16, z: 1.0, model: 'truck'    },  // mid south-east
+    { x: -14, y:  16, z: 1.0, model: 'sports'   },  // mid north-west
+  ],
+}
+
 // Vehicle classes — asymmetric stats. Server validates the type on join.
 // Multipliers stack on top of PHYSICS.car.controls values; HP overrides COMBAT.maxHp.
 export const VEHICLE_TYPES = {
