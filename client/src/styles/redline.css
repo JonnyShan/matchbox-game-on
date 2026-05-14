@@ -243,7 +243,7 @@
 /* Chromatic aberration: red ghost shifted right, cyan ghost shifted left */
 .rl-wordmark::before,
 .rl-wordmark::after {
-    content: 'REDLINE';
+    content: '';
     position: absolute;
     inset: 0;
     z-index: -1;

@@ -275,11 +275,11 @@ export default class Application
 
         const tips = [
             'WASD to drive · SHIFT to boost',
-            'X to brake · SPACE to jump',
-            'F to fire · R if you get stuck',
-            'Race clean. Or wreck everything.',
-            'Missiles home. Don\'t waste them on walls.',
-            'Three modes. One track. Pick your lane.',
+            'SPACE to jump · R if you get stuck',
+            'Ten cars. Sixty seconds. Collect them all.',
+            'Boxes float gold over key zones — head for the glow.',
+            'The plateau holds the highest-value pickup. Take the ramps.',
+            'Boost between corridors to save seconds.',
         ]
         let tipIdx = 0
         $tip.textContent = tips[0]

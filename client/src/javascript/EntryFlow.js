@@ -1,8 +1,6 @@
-import gsap from 'gsap'
-
-// Matchbox single-mode flow:
-// Title screen → (press any key) → straight into COLLECT.
-// No menu, no onboarding, no manual mode pick. Locked to gameMode='collect'.
+// Single-mode Matchbox build: no title, no menu, no onboarding, no lobby.
+// Resources finish loading → EntryFlow seeds defaults → onComplete fires →
+// LobbyUI auto-submits → game starts.
 
 export default class EntryFlow
 {
@@ -11,55 +9,18 @@ export default class EntryFlow
         this.config     = _options.config
         this.onComplete = _options.onComplete
 
-        this.$title      = document.getElementById('redline-title')
-        this.$menu       = document.getElementById('redline-menu')
-        this.$onboarding = document.getElementById('redline-onboarding')
-        this.$grain      = document.getElementById('redline-grain')
+        // Hide legacy overlay nodes so they never flash
+        const $title      = document.getElementById('redline-title')
+        const $menu       = document.getElementById('redline-menu')
+        const $onboarding = document.getElementById('redline-onboarding')
+        const $grain      = document.getElementById('redline-grain')
 
-        // Hide the legacy menu + onboarding nodes outright (they ship from the
-        // template but are unreachable in single-mode Matchbox build).
-        if(this.$menu)       this.$menu.style.display       = 'none'
-        if(this.$onboarding) this.$onboarding.style.display = 'none'
+        if($title)      $title.style.display      = 'none'
+        if($menu)       $menu.style.display       = 'none'
+        if($onboarding) $onboarding.style.display = 'none'
+        if($grain)      $grain.classList.add('hidden')
 
-        this._showTitle()
-    }
-
-    _showTitle()
-    {
-        this.$title.classList.add('is-active')
-        this.$grain?.classList.remove('hidden')
-
-        const logo    = this.$title.querySelector('.mb-logo')
-        const tagline = this.$title.querySelector('.rl-tagline')
-        const stats   = this.$title.querySelector('.mb-stats')
-        const prompt  = this.$title.querySelector('.rl-prompt')
-
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-        tl.fromTo(logo,    { scale: 0.85, opacity: 0, y: -10 }, { scale: 1, opacity: 1, y: 0, duration: 0.9 })
-          .fromTo(tagline, { y: 12, opacity: 0 },               { y: 0, opacity: 1, duration: 0.5 }, '-=0.4')
-          .fromTo(stats,   { y: 12, opacity: 0 },               { y: 0, opacity: 1, duration: 0.5 }, '-=0.3')
-          .fromTo(prompt,  { opacity: 0 },                       { opacity: 0.55, duration: 0.4 }, '-=0.1')
-
-        const advance = () =>
-        {
-            document.removeEventListener('keydown', this._keyHandler)
-            this.$title.removeEventListener('click', this._clickHandler)
-            this._enterGame(logo, tagline, stats, prompt)
-        }
-
-        this._keyHandler = (e) =>
-        {
-            if(e.key === 'Control' || e.key === 'Shift' || e.key === 'Alt' || e.key === 'Meta') return
-            advance()
-        }
-        this._clickHandler = () => advance()
-        document.addEventListener('keydown', this._keyHandler, { once: true })
-        this.$title.addEventListener('click', this._clickHandler, { once: true })
-    }
-
-    _enterGame(logo, tagline, stats, prompt)
-    {
-        // Lock the mode + defaults — no lobby, no picker
+        // Lock the mode + defaults — no UI required
         this.config.gameMode  = 'collect'
         this.config.soloMode  = false
         this.config.skipLobby = true
@@ -67,17 +28,8 @@ export default class EntryFlow
         this.config.carType   = this.config.carType  || 'default'
         this.config.playerName = this.config.playerName || this._autoName()
 
-        gsap.timeline({
-            onComplete: () =>
-            {
-                this.$title.classList.remove('is-active')
-                this.$grain?.classList.add('hidden')
-                this.onComplete?.()
-            },
-        })
-        .to([logo, tagline, stats, prompt], {
-            opacity: 0, y: -8, duration: 0.45, ease: 'power2.in', stagger: 0.05,
-        })
+        // Defer one frame so Application's existing setup ordering stays intact
+        requestAnimationFrame(() => this.onComplete?.())
     }
 
     _autoName()

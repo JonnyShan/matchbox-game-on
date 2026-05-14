@@ -326,7 +326,7 @@ export default class World
                 $list.appendChild(li)
             })
         }
-        if($footer) $footer.textContent = 'MATCHBOX × REDLINE'
+        if($footer) $footer.textContent = 'MATCHBOX COLLECT'
 
         const $again = document.getElementById('rc-again')
         if($again) $again.onclick = () => window.location.reload()

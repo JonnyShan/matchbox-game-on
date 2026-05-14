@@ -67,7 +67,7 @@ function makeLogoTex()
     ctx.font = '700 200px "Space Grotesk", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('REDLINE', 512, 130)
+    ctx.fillText('MATCHBOX', 512, 130)
 
     // Subtle glow underline
     const g = ctx.createLinearGradient(140, 220, 884, 220)
@@ -234,7 +234,7 @@ export default class Arena
     _createDecals()
     {
         // REDLINE logo painted on the floor between spawn and plateau
-        this._addLogoDecal(0, -22, 18, 4.5, 0)
+        // Logo decal removed — Matchbox single-mode build keeps the floor clean.
 
         // Hazard chevron strips at key entry points
         this._addChevronStrip(  0, -38, 30, 1.4, 0)              // spawn line
