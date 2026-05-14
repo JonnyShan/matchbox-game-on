@@ -4,7 +4,6 @@ import * as THREE from 'three'
 const SPEED          = 65       // m/s
 const LIFE_MS        = 3500
 const COOLDOWN_MS    = 850
-const CAR_HIT_SQ     = 2.8 ** 2
 const WALL_SQ        = (7 + 1.5) ** 2
 const HOMING_RATE    = 2.5      // rad/s max turn toward target
 const TRAIL_SAMPLES  = 28       // history points kept per missile
@@ -51,7 +50,6 @@ export default class Weapons
         this.physics          = _options.physics
         this.centerPath       = _options.centerPath   || []
         this.remoteCarManager = _options.remoteCarManager || null
-        this.onHitCar         = _options.onHitCar     || null
         this.onFire           = _options.onFire        || null
 
         this.onFired     = _options.onFired     || null   // (x,y,z,dx,dy) → network sync
@@ -232,24 +230,8 @@ export default class Weapons
             // Wall collision
             if(this._offTrack(m.x, m.y)) { this._explode(m); this._removeMissile(i); continue }
 
-            // Remote car collision (local missiles only — remote missiles don't deal damage)
-            let hit = false
-            if(!m.isRemote && this.remoteCarManager)
-            {
-                for(const [id, car] of this.remoteCarManager.cars)
-                {
-                    const cp = car.container.position
-                    const dx = cp.x - m.x, dy = cp.y - m.y, dz = cp.z - m.z
-                    if(dx * dx + dy * dy + dz * dz < CAR_HIT_SQ)
-                    {
-                        this._explode(m)
-                        this._removeMissile(i)
-                        if(this.onHitCar) this.onHitCar(id, 30)
-                        hit = true; break
-                    }
-                }
-            }
-            if(hit) continue
+            // Hit detection is server-authoritative — server broadcasts combat:explosion
+            // when a missile resolves, which Network.js routes to spawn FX via _explodeAt.
 
             // Trail sampling
             if(m.traveled >= TRAIL_DIST)

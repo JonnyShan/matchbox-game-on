@@ -1,5 +1,6 @@
 import CANNON from 'cannon'
 import * as THREE from 'three'
+import { VEHICLE_TYPES } from '../../../../shared/constants.js'
 
 export default class Physics
 {
@@ -122,7 +123,10 @@ export default class Physics
         this.car.options.chassisHeight = 1.16
         this.car.options.chassisDepth = 2.03
         this.car.options.chassisOffset = new CANNON.Vec3(0, 0, 0.41)
-        this.car.options.chassisMass = 40
+        // Vehicle class multipliers — server validates the type on join
+        const vtype = VEHICLE_TYPES[this.config?.carType] ?? VEHICLE_TYPES.default
+        this.car.options.vehicleType = vtype
+        this.car.options.chassisMass = 40 * vtype.massMul
         this.car.options.wheelFrontOffsetDepth = 0.635
         this.car.options.wheelBackOffsetDepth = - 0.475
         this.car.options.wheelOffsetWidth = 0.39
@@ -139,12 +143,12 @@ export default class Physics
         this.car.options.wheelCustomSlidingRotationalSpeed = - 30
         this.car.options.wheelMass = 5
         this.car.options.controlsSteeringSpeed = 0.005 * 3
-        this.car.options.controlsSteeringMax = Math.PI * 0.17
+        this.car.options.controlsSteeringMax = Math.PI * 0.17 * vtype.steerMul
         this.car.options.controlsSteeringQuad = false
-        this.car.options.controlsAcceleratinMaxSpeed = 0.055 * 3 / 17
-        this.car.options.controlsAcceleratinMaxSpeedBoost = 0.11 * 3 / 17
-        this.car.options.controlsAcceleratingSpeed = 2 * 4 * 2
-        this.car.options.controlsAcceleratingSpeedBoost = 3.5 * 4 * 2
+        this.car.options.controlsAcceleratinMaxSpeed = (0.055 * 3 / 17) * vtype.forceMul
+        this.car.options.controlsAcceleratinMaxSpeedBoost = (0.11 * 3 / 17) * vtype.boostMul
+        this.car.options.controlsAcceleratingSpeed = (2 * 4 * 2) * vtype.forceMul
+        this.car.options.controlsAcceleratingSpeedBoost = (3.5 * 4 * 2) * vtype.boostMul
         this.car.options.controlsAcceleratingQuad = true
         this.car.options.controlsBrakeStrength = 0.45 * 3
 

@@ -1,6 +1,18 @@
 import CANNON from 'cannon'
 import { PhysicsWorld } from './PhysicsWorld.js'
-import { NETWORK, SPAWN_GRID } from '../../shared/constants.js'
+import { HealthSystem } from './HealthSystem.js'
+import { CombatRules } from './CombatRules.js'
+import { MinesSystem } from './MinesSystem.js'
+import { ChatRateLimiter } from './ChatRateLimiter.js'
+import {
+  sanitizeName,
+  sanitizeCarColor,
+  sanitizeCarType,
+  sanitizeChatText,
+  isValidSpawnVec,
+  isValidPos,
+} from './Validators.js'
+import { NETWORK, COMBAT, SPAWN_GRID } from '../../shared/constants.js'
 
 const { tickRate, physicsRate, maxPlayers } = NETWORK
 
@@ -8,7 +20,13 @@ export class GameRoom {
   constructor(io) {
     this.io      = io
     this.physics = new PhysicsWorld()
-    this.players = new Map() // socketId → { id, name, carColor, actions }
+    this.players = new Map() // socketId → { id, name, carColor, carType, actions, spawnXY, clientSnapshot, kills }
+
+    this.health = new HealthSystem()
+    this.combat = new CombatRules()
+    this.mines  = new MinesSystem()
+    this.chat   = new ChatRateLimiter()
+    this._pendingMeteors = []   // [{ x, y, impactAt }]
 
     this._startLoop()
     this._setupSocketEvents()
@@ -19,15 +37,17 @@ export class GameRoom {
   // Skips emit when nobody is connected to save bandwidth.
   _startMeteorShower() {
     const SPAWN_RANGE = 38
+    const METEOR_FALL_MS = 1500
     const tick = () => {
       const delay = 250 + Math.random() * 350   // 250–600ms (avg ~425ms)
       setTimeout(() => {
         if (this.players.size > 0) {
-          this.io.emit('combat:meteor', {
-            x: (Math.random() - 0.5) * SPAWN_RANGE * 2,
-            y: (Math.random() - 0.5) * SPAWN_RANGE * 2,
-            t: Date.now(),
-          })
+          const now = Date.now()
+          const x = (Math.random() - 0.5) * SPAWN_RANGE * 2
+          const y = (Math.random() - 0.5) * SPAWN_RANGE * 2
+          this.io.emit('combat:meteor', { x, y, t: now })
+          // Track the strike so _resolveCombat can apply damage server-side
+          this._pendingMeteors.push({ x, y, impactAt: now + METEOR_FALL_MS })
         }
         tick()
       }, delay)
@@ -46,45 +66,53 @@ export class GameRoom {
       console.log(`[+] ${socket.id}`)
 
       socket.on('ping', (cb) => {
-        // Return the server's current epoch time so clients can compute
-        // (clock skew + half RTT) and align interpolation timestamps
-        if(typeof cb === 'function') cb(Date.now())
+        if (typeof cb === 'function') cb(Date.now())
       })
 
-      socket.on('player:join', ({ name, carColor, carType }) => {
+      socket.on('player:join', (rawPayload) => {
+        const name     = sanitizeName(rawPayload?.name)
+        const carColor = sanitizeCarColor(rawPayload?.carColor)
+        const carType  = sanitizeCarType(rawPayload?.carType)
+
         const spawnPos = this._getSpawnPosition()
         this.physics.addCar(socket.id, spawnPos)
+        this.health.addPlayer(socket.id, carType)
 
         this.players.set(socket.id, {
           id:       socket.id,
-          name:     name || 'Anonymous',
-          carColor: carColor ?? 0,
-          carType:  carType || 'default',
+          name,
+          carColor,
+          carType,
           actions:  { up: false, down: false, left: false, right: false, brake: false, boost: false },
           spawnXY:  { x: spawnPos.x, y: spawnPos.y },
+          kills:    0,
         })
 
-        // Send existing players to new joiner
+        // Send existing players to new joiner (with their types so they get correct stats locally)
         const existingPlayers = [...this.players.values()]
           .filter(p => p.id !== socket.id)
           .map(({ id, name, carColor, carType }) => ({ id, name, carColor, carType }))
 
-        // Include spawn position so client can initialise the local car at the same spot
-        socket.emit('room:joined', { id: socket.id, existingPlayers, spawnPos: { x: spawnPos.x, y: spawnPos.y } })
+        socket.emit('room:joined', {
+          id: socket.id,
+          existingPlayers,
+          spawnPos: { x: spawnPos.x, y: spawnPos.y },
+          maxHp: this.health.getMaxHp(socket.id),
+          invulnMs: COMBAT.spawnInvulnMs,
+        })
 
         // Notify everyone else
         socket.broadcast.emit('player:joined', {
           id: socket.id,
-          name: name || 'Anonymous',
-          carColor: carColor ?? 0,
-          carType:  carType || 'default',
+          name,
+          carColor,
+          carType,
         })
 
-        console.log(`[join] ${name} (${socket.id}) — ${this.players.size} online`)
+        console.log(`[join] ${name} (${socket.id}) type=${carType} — ${this.players.size} online`)
       })
 
       socket.on('player:ready', () => {
-        // Client reveal animation just started — reset server car to spawn z=12 so both fall together
         const car    = this.physics.cars.get(socket.id)
         const player = this.players.get(socket.id)
         if (car && player) {
@@ -93,71 +121,99 @@ export class GameRoom {
           car.chassis.velocity.set(0, 0, 0)
           car.chassis.angularVelocity.set(0, 0, 0)
           car.chassis.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), 0)
-          console.log(`[ready] ${player.name} — car reset to (${x.toFixed(2)}, ${y.toFixed(2)}, 12)`)
         }
       })
 
       socket.on('player:input', (actions) => {
         const player = this.players.get(socket.id)
-        if (player) player.actions = actions
+        if (player && actions && typeof actions === 'object') player.actions = actions
       })
 
-      socket.on('player:bump', ({ targetId, fromPos }) => {
-        // Relay bump to the target player so their car reacts too
+      socket.on('player:bump', ({ targetId, fromPos } = {}) => {
         const targetSocket = this.io.sockets.sockets.get(targetId)
         if (targetSocket) {
           targetSocket.emit('player:bumped', { fromId: socket.id, fromPos })
         }
       })
 
-      socket.on('chat:message', ({ text }) => {
+      socket.on('chat:message', ({ text } = {}) => {
         const player = this.players.get(socket.id)
-        if (!player || !text || typeof text !== 'string') return
-        const clean = text.slice(0, 120).trim()
+        if (!player) return
+        const clean = sanitizeChatText(text)
         if (!clean) return
-        // Broadcast to everyone else
+
+        const { allowed } = this.chat.check(socket.id, Date.now())
+        if (!allowed) {
+          socket.emit('chat:rate-limited')
+          return
+        }
+
         socket.broadcast.emit('chat:message', {
           name: player.name,
           text: clean,
-          color: player.carColor ?? 0,
+          color: player.carColor,
         })
       })
 
+      // ── Combat: missile fire (server-authoritative) ──
       socket.on('combat:missile', (data) => {
-        console.log(`[combat] missile from ${socket.id}`, data)
-        socket.broadcast.emit('combat:missile', { fromId: socket.id, ...data })
+        if (this.health.isDead(socket.id)) return
+        if (this.health.isInvulnerable(socket.id)) return  // can't fire during spawn invuln
+        if (!isValidSpawnVec(data)) return
+
+        const ok = this.combat.registerMissile(socket.id, data, Date.now())
+        if (!ok) return
+
+        // Broadcast to everyone (including shooter) so visuals stay in sync via one channel
+        this.io.emit('combat:missile', {
+          fromId: socket.id,
+          x: data.x, y: data.y, z: data.z, dx: data.dx, dy: data.dy,
+        })
       })
 
-      socket.on('player:combatDamage', ({ targetId, amount }) => {
-        console.log(`[combat] damage from ${socket.id} → ${targetId} (${amount}hp)`)
-        const targetSocket = this.io.sockets.sockets.get(targetId)
-        if (targetSocket) {
-          targetSocket.emit('player:combatDamage', { fromId: socket.id, amount })
-        } else {
-          console.warn(`[combat] target socket ${targetId} not found`)
-        }
+      // ── Combat: drop a mine (server-authoritative) ──
+      socket.on('combat:mineDrop', (data) => {
+        if (this.health.isDead(socket.id)) return
+        if (this.health.isInvulnerable(socket.id)) return
+        if (!isValidPos(data)) return
+
+        const mine = this.mines.registerDrop(socket.id, data, Date.now())
+        if (!mine) return
+
+        this.io.emit('combat:mineDropped', {
+          fromId:    socket.id,
+          mineId:    mine.id,
+          x:         mine.x,
+          y:         mine.y,
+          z:         mine.z,
+          armedAt:   mine.armedAt,
+        })
       })
+
+      // Client-trusted damage event is intentionally NOT handled.
+      // All damage is produced by CombatRules.tick() / MinesSystem.tick() server-side.
 
       socket.on('combat:explosion', (data) => {
-        // Broadcast explosion position to all other players
+        // Visual-only relay — actual damage happens server-side via missile resolution.
         socket.broadcast.emit('combat:explosion', { fromId: socket.id, ...data })
       })
 
       socket.on('combat:carDestroyed', (data) => {
-        console.log(`[combat] car destroyed: ${socket.id}`)
+        // Visual-only relay. Server's HP authority is the canonical kill source.
         socket.broadcast.emit('combat:carDestroyed', { fromId: socket.id, ...data })
       })
 
       socket.on('player:snapshot', (state) => {
-        // Client sends its own authoritative physics state.
-        // We cache it and use it in world:snapshot broadcasts so that remote
-        // players see exactly the same thing as the local player.
         const player = this.players.get(socket.id)
-        if (player) player.clientSnapshot = state
+        if (player && state && typeof state === 'object') player.clientSnapshot = state
       })
 
       socket.on('disconnect', () => {
         this.physics.removeCar(socket.id)
+        this.health.removePlayer(socket.id)
+        this.combat.removeOwner(socket.id)
+        this.mines.removeOwner(socket.id)
+        this.chat.removeOwner(socket.id)
         const player = this.players.get(socket.id)
         this.players.delete(socket.id)
         this.io.emit('player:left', { id: socket.id })
@@ -185,8 +241,7 @@ export class GameRoom {
       // Step physics
       this.physics.step(delta)
 
-      // Broadcast at tickRate — use client-reported snapshots so remote players
-      // see exactly what the local player sees (same physics, no server divergence).
+      // Broadcast at tickRate using client-reported snapshots
       broadcastAccum += delta * 1000
       if (broadcastAccum >= broadcastInterval) {
         broadcastAccum -= broadcastInterval
@@ -199,8 +254,128 @@ export class GameRoom {
         if (cars.length > 0) {
           this.io.emit('world:snapshot', { t: now, cars })
         }
+
+        // ── Combat resolution: missiles + mines + respawns ──
+        this._resolveCombat(now)
       }
     }, physicsInterval)
+  }
+
+  _resolveCombat(now) {
+    // Build position map from latest snapshots
+    const carPositions = new Map()
+    for (const [id, p] of this.players) {
+      if (p.clientSnapshot?.pos) {
+        carPositions.set(id, {
+          x: p.clientSnapshot.pos[0],
+          y: p.clientSnapshot.pos[1],
+          z: p.clientSnapshot.pos[2],
+        })
+      }
+    }
+
+    const invuln = (id) => this.health.isInvulnerable(id, now) || this.health.isDead(id)
+
+    // ── Missiles ──
+    const { hits, expired } = this.combat.tick(now, carPositions, invuln)
+    for (const hit of hits) {
+      this._applyHit(hit.victimId, hit.ownerId, hit.damage, hit.x, hit.y, hit.z, 'missile')
+      this.io.emit('combat:explosion', { fromId: hit.ownerId, x: hit.x, y: hit.y, z: hit.z })
+    }
+    for (const ex of expired) {
+      this.io.emit('combat:explosion', { fromId: ex.ownerId, x: ex.x, y: ex.y, z: ex.z })
+    }
+
+    // ── Meteors ── apply damage when impact time elapses
+    for (let i = this._pendingMeteors.length - 1; i >= 0; i--) {
+      const m = this._pendingMeteors[i]
+      if (now < m.impactAt) continue
+      const r2 = COMBAT.meteor.hitRadius * COMBAT.meteor.hitRadius
+      for (const [victimId, pos] of carPositions) {
+        if (invuln(victimId)) continue
+        if (pos.z > 4) continue   // airborne car is safe
+        const dx = pos.x - m.x, dy = pos.y - m.y
+        if (dx * dx + dy * dy <= r2) {
+          this._applyHit(victimId, victimId, COMBAT.meteor.damage, m.x, m.y, 0.5, 'meteor')
+        }
+      }
+      this._pendingMeteors.splice(i, 1)
+    }
+
+    // ── Mines ──
+    const { explosions: mineExplosions, expired: mineExpired } = this.mines.tick(now, carPositions, invuln)
+    for (const ex of mineExplosions) {
+      this.io.emit('combat:mineExplosion', { mineId: ex.id, fromId: ex.ownerId, x: ex.x, y: ex.y, z: ex.z })
+      for (const v of ex.victims) {
+        this._applyHit(v.id, ex.ownerId, v.damage, ex.x, ex.y, ex.z, 'mine')
+      }
+    }
+    for (const m of mineExpired) {
+      this.io.emit('combat:mineExpired', { mineId: m.id, fromId: m.ownerId })
+    }
+
+    // ── Respawns ──
+    const respawnedIds = this.health.tickRespawns(now)
+    for (const id of respawnedIds) {
+      const player = this.players.get(id)
+      const sp = player?.spawnXY ?? { x: 0, y: -35 }
+      // Reset server physics car so it doesn't drift while dead
+      const car = this.physics.cars.get(id)
+      if (car) {
+        car.chassis.position.set(sp.x, sp.y, 12)
+        car.chassis.velocity.set(0, 0, 0)
+        car.chassis.angularVelocity.set(0, 0, 0)
+      }
+      this.io.emit('combat:respawn', {
+        id,
+        hp: this.health.getMaxHp(id),
+        x: sp.x,
+        y: sp.y,
+        invulnUntil: now + COMBAT.spawnInvulnMs,
+      })
+    }
+  }
+
+  _applyHit(victimId, attackerId, damage, x, y, z, source) {
+    const result = this.health.applyDamage(victimId, damage, Date.now())
+    if (result.ignored || result.blocked) return
+
+    const isEnv = attackerId === victimId || !this.players.has(attackerId)
+    const attackerName = isEnv ? null : (this.players.get(attackerId)?.name ?? '???')
+    const victimName   = this.players.get(victimId)?.name ?? '???'
+
+    this.io.emit('combat:hp', {
+      id:           victimId,
+      hp:           result.hp,
+      maxHp:        this.health.getMaxHp(victimId),
+      fromId:       isEnv ? null : attackerId,
+      fromName:     isEnv ? this._envLabel(source) : attackerName,
+      victimName,
+      amount:       damage,
+      x, y, z,
+      source,
+    })
+
+    if (result.died) {
+      const attacker = isEnv ? null : this.players.get(attackerId)
+      if (attacker) attacker.kills++
+      this.io.emit('combat:death', {
+        id:            victimId,
+        victimName,
+        killerId:      isEnv ? null : attackerId,
+        killerName:    isEnv ? this._envLabel(source) : attackerName,
+        attackerKills: attacker?.kills ?? 0,
+        source,
+      })
+    }
+  }
+
+  _envLabel(source) {
+    switch (source) {
+      case 'meteor': return 'Meteor ☄️'
+      case 'mine':   return 'Mine 💣'
+      default:       return 'Environment'
+    }
   }
 
   _getSpawnPosition() {

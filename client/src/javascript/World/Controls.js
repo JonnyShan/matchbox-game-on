@@ -133,6 +133,10 @@ export default class Controls extends EventEmitter
                 case 'KeyF':
                     this.trigger('action', ['fire'])
                     break
+
+                case 'KeyB':
+                    this.trigger('action', ['mine'])
+                    break
             }
         }
 

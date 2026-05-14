@@ -1,4 +1,4 @@
-import { CAR_COLORS } from '../../../shared/constants.js'
+import { CAR_COLORS, VEHICLE_TYPES } from '../../../shared/constants.js'
 
 export default class LobbyUI
 {
@@ -23,10 +23,35 @@ export default class LobbyUI
         this._step     = 0
 
         this._buildColorGrid()
+        this._buildVehicleGrid()
         this._bindLobbyEvents()
         this._restoreSavedUI()
         this._setupQuickPlay()
         this._setupNetworkEvents()
+    }
+
+    _buildVehicleGrid()
+    {
+        const grid = document.querySelector('.car-grid')
+        if(!grid) return
+        // Replace the static markup with one card per VEHICLE_TYPES entry (skip cybertruck — it's just an alt cosmetic)
+        const ENTRIES = ['default', 'speeder', 'tank']
+        grid.innerHTML = ''
+        for(const key of ENTRIES)
+        {
+            const v = VEHICLE_TYPES[key]
+            const el = document.createElement('div')
+            el.className = 'car-option' + (key === this._carType ? ' selected' : '')
+            el.dataset.type = key
+            el.innerHTML = `
+                <div class="car-icon">${v.icon}</div>
+                <div class="car-name">${v.name}</div>
+                <div class="car-stats" style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:6px;letter-spacing:0.5px;">
+                  HP ${v.hp} · SPD ${v.forceMul.toFixed(2)}x
+                </div>
+            `
+            grid.appendChild(el)
+        }
     }
 
     // ─── Persistence ─────────────────────────────────────────────────────────
@@ -196,6 +221,7 @@ export default class LobbyUI
         this._save()
         this.config.cyberTruck  = (this._carType === 'cybertruck')
         this.config.carColor    = this._colorIdx
+        this.config.carType     = this._carType
         this.config.playerName  = this._name
         this.$lobby.classList.add('hidden')
 

@@ -89,3 +89,88 @@ export const CAR_COLORS = [
   '#e91e63', // pink
   '#ffffff',  // white
 ]
+
+// ── Combat tuning — server is authoritative; client visuals reflect server truth ──
+export const COMBAT = {
+  maxHp:              100,
+  respawnMs:          3000,
+  spawnInvulnMs:      2000,    // 2s invulnerability window after respawn
+
+  missile: {
+    speed:            65,      // m/s — matches client Weapons.js SPEED
+    lifeMs:           3500,
+    cooldownMs:       850,
+    hitRadius:        2.8,
+    damage:           30,
+    maxInFlight:      40,      // global cap to prevent abuse
+  },
+
+  meteor: {
+    damage:           25,
+    hitRadius:        3.5,
+  },
+
+  mine: {
+    armDelayMs:       1000,    // 1s arming time after drop
+    lifeMs:           45000,   // mines persist 45s before despawn
+    triggerRadius:    2.4,
+    explosionRadius:  4.0,
+    damage:           45,
+    cooldownMs:       2500,
+    maxPerPlayer:     4,
+  },
+
+  chat: {
+    minIntervalMs:    700,     // 0.7s between messages per player
+    burstMax:         4,       // up to 4 messages allowed in burst window
+    burstWindowMs:    5000,    // 5s window for burst
+    maxLength:        120,
+    maxNameLength:    16,
+  },
+}
+
+// Vehicle classes — asymmetric stats. Server validates the type on join.
+// Multipliers stack on top of PHYSICS.car.controls values; HP overrides COMBAT.maxHp.
+export const VEHICLE_TYPES = {
+  default: {
+    name:        'Default',
+    icon:        '🚗',
+    blurb:       'Balanced HP, speed, and handling.',
+    hp:          100,
+    forceMul:    1.0,
+    boostMul:    1.0,
+    massMul:     1.0,
+    steerMul:    1.0,
+  },
+  speeder: {
+    name:        'Speeder',
+    icon:        '🏎️',
+    blurb:       'Glass cannon. Fast and nimble, fragile.',
+    hp:          75,
+    forceMul:    1.2,
+    boostMul:    1.25,
+    massMul:     0.8,
+    steerMul:    1.15,
+  },
+  tank: {
+    name:        'Tank',
+    icon:        '🚙',
+    blurb:       'Heavy bruiser. More HP, slower.',
+    hp:          160,
+    forceMul:    0.9,
+    boostMul:    0.85,
+    massMul:     1.5,
+    steerMul:    0.85,
+  },
+  // Cybertruck stays as default-equivalent for backwards compatibility
+  cybertruck: {
+    name:        'Cybertruck',
+    icon:        '🚙',
+    blurb:       'Default stats, alt cosmetic.',
+    hp:          100,
+    forceMul:    1.0,
+    boostMul:    1.0,
+    massMul:     1.0,
+    steerMul:    1.0,
+  },
+}

@@ -27,6 +27,17 @@ import HazardZones from './HazardZones.js'
 import ArenaMinimap from './ArenaMinimap.js'
 import { ARENA_PICKUPS } from './CombatPickups.js'
 import Meteors from './Meteors.js'
+import Mines from './Mines.js'
+import Killfeed from './Killfeed.js'
+import DamageNumbers from './DamageNumbers.js'
+import { CAR_COLORS } from '../../../../shared/constants.js'
+
+function escapeHtml(s)
+{
+    return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]))
+}
 
 export default class World
 {
@@ -522,17 +533,28 @@ export default class World
         })
     }
 
-    _shakeCamera()
+    _shakeCamera(intensity = 0.5)
     {
         const canvas = document.querySelector('canvas')
         if(!canvas) return
+        const i = Math.max(0, Math.min(1.5, intensity))
+        const range = 10 + i * 16    // 10px → 34px
+        const rot   = 0.6 + i * 0.9  // 0.6deg → 2.1deg
+        const dur   = 0.25 + i * 0.15
         canvas.style.transition = 'none'
-        canvas.style.transform  = `translate(${(Math.random() - 0.5) * 10}px, ${(Math.random() - 0.5) * 10}px) rotate(${(Math.random() - 0.5) * 0.6}deg)`
+        canvas.style.transform  = `translate(${(Math.random() - 0.5) * range}px, ${(Math.random() - 0.5) * range}px) rotate(${(Math.random() - 0.5) * rot}deg)`
         requestAnimationFrame(() =>
         {
-            canvas.style.transition = 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+            canvas.style.transition = `transform ${dur}s cubic-bezier(0.25, 0.46, 0.45, 0.94)`
             canvas.style.transform  = 'translate(0, 0) rotate(0deg)'
         })
+    }
+
+    _lookupRemoteColor(socketId)
+    {
+        // Remote car colors are stored on RemoteCar instances after player:joined
+        const rc = this.remoteCarManager?.cars?.get(socketId)
+        return rc?.carColor ?? 0
     }
 
     _setupYouLabel()
@@ -712,19 +734,12 @@ export default class World
 
     setCombat()
     {
-        // ── Weapon system ──
+        // ── Weapon system (visual + remote spawn only; server validates all hits) ──
         this.weapons = new Weapons({
             scene:            this.scene,
             physics:          this.physics,
             centerPath:       this.track?.centerPath || [],
             remoteCarManager: this.remoteCarManager || null,
-            onHitCar: (id, dmg) =>
-            {
-                if(this.network) this.network.sendCombatDamage(id, dmg)
-                // Track damage so _setupCombatEnd can attribute kills
-                if(!this._recentDamage) this._recentDamage = new Map()
-                this._recentDamage.set(id, Date.now())
-            },
             onFire: () =>
             {
                 this.sounds?.play('carHit', 12)
@@ -733,18 +748,23 @@ export default class World
             {
                 if(this.network) this.network.sendMissileFired(x, y, z, dx, dy)
             },
-            onExploded: (x, y, z) =>
-            {
-                if(this.network) this.network.sendExplosion(x, y, z)
-            },
         })
 
-        // ── Receive remote missiles and explosions ──
+        // ── Mines (visual + drop intent; server resolves everything) ──
+        this.mines = new Mines({ scene: this.scene, weapons: this.weapons })
+
+        // ── Killfeed + floating damage numbers ──
+        this.killfeed      = new Killfeed({ network: this.network })
+        this.damageNumbers = new DamageNumbers({ scene: this.scene, network: this.network })
+
+        // ── Receive remote missiles, mines, explosions, deaths ──
         if(this.network)
         {
-            this.network.on('combat:missile', ({ x, y, z, dx, dy }) =>
+            // Spawn visual missile from server broadcast — both local AND remote use this
+            // path so the missile we see is the one the server is actually simulating
+            this.network.on('combat:missile', ({ fromId, x, y, z, dx, dy }) =>
             {
-                console.log('[world] remote missile spawn at', x, y, z)
+                if(fromId === this.network.localId) return  // local fire already spawned its own visual
                 this.weapons.spawnRemoteMissile(x, y, z, dx, dy)
             })
 
@@ -757,11 +777,31 @@ export default class World
             {
                 this._destroyRemoteCar(fromId, x, y, z, vx, vy, color)
             })
+
+            // Mines
+            this.network.on('combat:mineDropped', ({ mineId, fromId, x, y, z, armedAt }) =>
+            {
+                const colorIdx = this._lookupRemoteColor(fromId)
+                const hex = parseInt((CAR_COLORS[colorIdx] || '#ff2e4d').slice(1), 16)
+                this.mines.add(mineId, x, y, z, armedAt, hex)
+            })
+
+            this.network.on('combat:mineExplosion', ({ mineId, x, y, z }) =>
+            {
+                this.mines.explode(mineId, x, y, z)
+                this._shakeCamera()
+            })
+
+            this.network.on('combat:mineExpired', ({ mineId }) =>
+            {
+                this.mines.expire(mineId)
+            })
         }
 
-        // ── Health system ──
+        // ── Health system (presentational — listens to server events) ──
         this.healthSystem = new HealthSystem({
             physics:  this.physics,
+            network:  this.network,
             spawnPos: this._serverSpawnPos || { x: 5, y: -35 },
         })
 
@@ -787,38 +827,74 @@ export default class World
             },
         })
 
-        // ── Controls: F key fires ──
+        // ── Controls: F key fires, B key drops mine ──
         this.controls.on('action', (name) =>
         {
-            if(name !== 'fire') return
-            const ok = this.weapons.fire()
-            if(!ok && this.weapons.ammo <= 0)
-                this._showCombatPickup('NO AMMO', '#e74c3c')
-            if(ok) this._updateCombatHUD()
+            if(name === 'fire')
+            {
+                if(this.healthSystem?.isInvulnerable?.())
+                {
+                    this._showCombatPickup('SPAWN INVULN — CAN\'T FIRE', '#888')
+                    return
+                }
+                const ok = this.weapons.fire()
+                if(!ok && this.weapons.ammo <= 0)
+                    this._showCombatPickup('NO AMMO', '#e74c3c')
+                if(ok) this._updateCombatHUD()
+            }
+            else if(name === 'mine')
+            {
+                if(this.healthSystem?.isInvulnerable?.() || this.healthSystem?.isDead?.()) return
+                const body = this.physics.car.chassis.body
+                if(!body) return
+                // Drop slightly behind the car along its -X local axis (which is rear in body frame)
+                const q = body.quaternion
+                const hx = 1 - 2 * (q.y * q.y + q.z * q.z)
+                const hy = 2 * (q.x * q.y + q.z * q.w)
+                const len = Math.sqrt(hx * hx + hy * hy) || 1
+                const dx = -hx / len, dy = -hy / len
+                const px = body.position.x + dx * 1.6
+                const py = body.position.y + dy * 1.6
+                if(this.network) this.network.sendMineDrop(px, py, 0.1)
+                this.sounds?.play('uiArea', 0)
+            }
         })
 
-        // ── Health events ──
-        this.healthSystem.on('damage', ({ hp }) =>
+        // ── Health events (driven by server combat:hp/death/respawn) ──
+        this.healthSystem.on('damage', ({ hp, amount }) =>
         {
             this._updateCombatHUD()
-            this._shakeCamera()
+            // Camera shake scales with damage taken
+            const intensity = Math.min(1, amount / 50)
+            this._shakeCamera(intensity)
             this._flashDamage()
         })
 
         this.healthSystem.on('healed', () => { this._updateCombatHUD() })
 
-        this.healthSystem.on('death', () =>
+        this.healthSystem.on('death', ({ killerName, source }) =>
         {
             this._updateCombatHUD()
             this._destroyLocalCar()
 
             const $ov = document.getElementById('death-overlay')
             if($ov) $ov.classList.add('visible')
-            let t = 3
+            const $sub   = document.getElementById('death-sub')
             const $timer = document.getElementById('death-timer')
+            // Heavier shake on death
+            this._shakeCamera(1.0)
+            setTimeout(() => this._shakeCamera(0.6), 80)
+            // Show killer attribution
+            if($sub && killerName)
+            {
+                const icon = source === 'mine' ? '💣' : source === 'meteor' ? '☄️' : '🚀'
+                $sub.innerHTML = `Killed by <strong>${escapeHtml(killerName)}</strong> ${icon} · Respawning in <span id="death-timer">3</span>...`
+            }
+            let t = 3
             const tick = () =>
             {
-                if($timer) $timer.textContent = t
+                const t2 = document.getElementById('death-timer')
+                if(t2) t2.textContent = t
                 if(t > 0) { t--; setTimeout(tick, 1000) }
             }
             tick()
@@ -833,15 +909,6 @@ export default class World
             const $ov = document.getElementById('death-overlay')
             if($ov) $ov.classList.remove('visible')
         })
-
-        // ── Receive damage from multiplayer ──
-        if(this.network)
-        {
-            this.network.on('player:combatDamage', ({ amount }) =>
-            {
-                this.healthSystem.takeDamage(amount)
-            })
-        }
 
         // ── Show combat HUD ──
         const $hp  = document.getElementById('hp-container')
@@ -899,6 +966,22 @@ export default class World
             this.hazardZones?.update(dt)
             this.arenaMinimap?.update(dt)
             this.meteors?.update(dt)
+            this.mines?.update(dt)
+            this.damageNumbers?.update(dt)
+            // Visual cue: car flickers during spawn invuln
+            if(this.car?.chassis?.object && this.healthSystem)
+            {
+                const inv = this.healthSystem.isInvulnerable()
+                if(inv)
+                {
+                    const flicker = Math.sin(Date.now() * 0.025) > 0
+                    this.car.chassis.object.visible = flicker
+                }
+                else if(!this._dead && this.car.chassis.object.visible === false)
+                {
+                    this.car.chassis.object.visible = true
+                }
+            }
         })
     }
 
@@ -1259,21 +1342,16 @@ export default class World
         if($kc) $kc.classList.add('visible')
         this._updateKillCounter(0, TARGET_KILLS)
 
-        // Heuristic: if a car was destroyed within 1500ms of us hitting it,
-        // attribute the kill to us. Server-side tracking would be more accurate
-        // but this is a solid signal for the common case.
+        // Server-authoritative kill attribution — combat:death includes attackerKills
+        // for the player who scored the kill. We pick out the events where killerId
+        // matches our local id and increment our own counter.
         if(this.network)
         {
-            this.network.on('combat:carDestroyed', ({ fromId }) =>
+            this.network.on('combat:death', ({ killerId, attackerKills }) =>
             {
                 if(this._combatOver) return
-                if(!this._recentDamage) return
-                const stamp = this._recentDamage.get(fromId)
-                if(!stamp) return
-                if(Date.now() - stamp > 1500) return
-
-                this._recentDamage.delete(fromId)
-                this._kills++
+                if(killerId !== this.network.localId) return
+                this._kills = attackerKills
                 this._updateKillCounter(this._kills, TARGET_KILLS)
                 this._showCombatPickup?.(`+1 KILL`, '#FF2E4D')
 
