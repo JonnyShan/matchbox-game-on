@@ -12,11 +12,31 @@ const BEAM_RADIUS = 0.55
 const BOB_AMP   = 0.25
 const BOB_SPEED = 0.0019
 
+// 10 distinct cars to match the real Matchbox collection variety.
+// shape ∈ { 'sedan' | 'pickup' | 'sports' | 'truck' | 'micro' | 'classic' | 'wagon' }
 const CAR_MODELS = {
-    pickup: { name: "'62 NISSAN JUNIOR",   body: '#9bbf80', accent: '#7aa05f' },
-    sedan:  { name: "'68 BLUEBIRD WAGON",  body: '#4978c8', accent: '#3b65a8' },
-    sports: { name: "'70 DODGE CHALLENGER",body: '#e54e34', accent: '#b73a25' },
-    truck:  { name: "'75 INTERNATIONAL",    body: '#e09a1f', accent: '#b87c10' },
+    nissan_pickup:    { name: "'62 NISSAN JUNIOR",        brand: 'NISSAN',   body: '#9bbf80', accent: '#7aa05f', window: '#bfd9d8', shape: 'pickup'   },
+    el_camino:        { name: "'63 CHEVY EL CAMINO",      brand: 'CHEVY',    body: '#a8c6dc', accent: '#7a98ae', window: '#cfe1e8', shape: 'pickup'   },
+    ford_f150:        { name: "'21 FORD F-150 LIGHTNING", brand: 'FORD',     body: '#2a2e34', accent: '#15171b', window: '#9fb3bd', shape: 'truck'    },
+    dodge_challenger: { name: "'70 DODGE CHALLENGER",     brand: 'DODGE',    body: '#c63027', accent: '#8c1f17', window: '#bfd9d8', shape: 'sports'   },
+    ford_mustang:     { name: "'19 FORD MUSTANG COBRA",   brand: 'FORD',     body: '#1a1a1a', accent: '#3d3d3d', window: '#5a6f7a', shape: 'sports'   },
+    volvo_240:        { name: "'82 VOLVO 240 SEDAN",      brand: 'VOLVO',    body: '#7d1f23', accent: '#5a1014', window: '#cfd9d8', shape: 'sedan'    },
+    bluebird_wagon:   { name: "'68 BLUEBIRD WAGON",       brand: 'NISSAN',   body: '#4978c8', accent: '#3b65a8', window: '#bfd9d8', shape: 'wagon'    },
+    plymouth_coupe:   { name: "'40 PLYMOUTH COUPE",       brand: 'PLYMOUTH', body: '#e6cf86', accent: '#b9a25b', window: '#bfd9d8', shape: 'classic'  },
+    fiat_500:         { name: "'70 FIAT 500",             brand: 'FIAT',     body: '#8bcfb1', accent: '#5f9d83', window: '#cfe1d8', shape: 'micro'    },
+    international:    { name: "'75 INTERNATIONAL",        brand: 'IH',       body: '#e09a1f', accent: '#b87c10', window: '#bfd9d8', shape: 'truck'    },
+}
+
+// Brand badge color overrides the round "METAL" plate when the brand is famous
+const BRAND_BADGES = {
+    NISSAN:   { fg: '#cc0000', bg: '#f7ecd2' },
+    CHEVY:    { fg: '#d4a022', bg: '#1a1a1a' },
+    FORD:     { fg: '#0049b0', bg: '#f7ecd2' },
+    DODGE:    { fg: '#c63027', bg: '#f7ecd2' },
+    VOLVO:    { fg: '#0049b0', bg: '#f7ecd2' },
+    PLYMOUTH: { fg: '#6e4a1f', bg: '#f7ecd2' },
+    FIAT:     { fg: '#c63027', bg: '#f7ecd2' },
+    IH:       { fg: '#cc0000', bg: '#f7ecd2' },
 }
 
 // Build a Matchbox-style blister-pack texture matching the real toy packaging:
@@ -30,7 +50,7 @@ function makeBlisterTexture(modelKey)
     c.width = W; c.height = H
     const ctx = c.getContext('2d')
 
-    const model = CAR_MODELS[modelKey] || CAR_MODELS.pickup
+    const model = CAR_MODELS[modelKey] || CAR_MODELS.nissan_pickup
 
     // ── Hanger tab (top) ────────────────────────────────────────────────────
     ctx.fillStyle = '#e8d59f'
@@ -69,17 +89,18 @@ function makeBlisterTexture(modelKey)
     ctx.fillStyle = '#f7ecd2'
     ctx.fillText('METAL  ·  PARTS  ·  PIECES  ·  TOOL', W / 2, 56)
 
-    // ── Tiny round badge "Metal/Plastic" left ──────────────────────────────
+    // ── Brand badge top-left (Volvo / Chevy / Ford / Dodge / etc.) ─────────
+    const badge = BRAND_BADGES[model.brand] || { fg: '#8b4516', bg: '#f7ecd2' }
     ctx.beginPath()
     ctx.arc(40, 90, 26, 0, Math.PI * 2)
-    ctx.fillStyle = '#f7ecd2'
+    ctx.fillStyle = badge.bg
     ctx.fill()
     ctx.strokeStyle = '#8b4516'
     ctx.lineWidth = 2
     ctx.stroke()
-    ctx.fillStyle = '#8b4516'
-    ctx.font = '900 14px "Space Grotesk", sans-serif'
-    ctx.fillText('METAL', 40, 88)
+    ctx.fillStyle = badge.fg
+    ctx.font = '900 13px "Space Grotesk", sans-serif'
+    ctx.fillText(model.brand, 40, 88)
 
     // ── Red MATCHBOX logo pill ─────────────────────────────────────────────
     const pillX = 78, pillY = 76, pillW = 240, pillH = 56
@@ -172,7 +193,7 @@ function makeBlisterTexture(modelKey)
     }
 
     // ── Toy car drawn on top of the road, large + detailed ────────────────
-    drawCar(ctx, winX + winW * 0.42, winY + winH - 60, model, modelKey)
+    drawCar(ctx, winX + winW * 0.42, winY + winH - 60, model)
 
     // ── Blister bubble highlight (subtle gloss) ────────────────────────────
     ctx.fillStyle = 'rgba(255,255,255,0.07)'
@@ -224,101 +245,154 @@ function hashKey(s)
     return h
 }
 
-// Draw a stylized toy car silhouette at (cx, cy), scaled by model type.
-function drawCar(ctx, cx, cy, model, modelKey)
+// Draw a stylized toy car silhouette at (cx, cy), branched by model.shape.
+function drawCar(ctx, cx, cy, model)
 {
     const carW = 150, carH = 70
     const x0 = cx - carW / 2, y0 = cy - carH
+    const win = model.window || '#bfd9d8'
 
     ctx.save()
-    // shadow under car
+    // ground shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)'
     ctx.beginPath()
     ctx.ellipse(cx, cy + 6, carW * 0.45, 7, 0, 0, Math.PI * 2)
     ctx.fill()
 
-    if(modelKey === 'pickup')
+    ctx.fillStyle = model.body
+
+    switch(model.shape)
     {
-        // cab
-        ctx.fillStyle = model.body
-        roundRect(ctx, x0 + 8,  y0 + 20, 60, 36, 6); ctx.fill()
-        // bed
-        roundRect(ctx, x0 + 64, y0 + 30, 78, 26, 4); ctx.fill()
-        // window
-        ctx.fillStyle = '#bfd9d8'
-        roundRect(ctx, x0 + 16, y0 + 26, 46, 18, 4); ctx.fill()
-        // accent stripe
-        ctx.fillStyle = model.accent
-        ctx.fillRect(x0 + 8, y0 + 50, 134, 6)
-    }
-    else if(modelKey === 'sports')
-    {
-        ctx.fillStyle = model.body
-        ctx.beginPath()
-        ctx.moveTo(x0 + 6,   y0 + 56)
-        ctx.lineTo(x0 + 26,  y0 + 24)
-        ctx.lineTo(x0 + 100, y0 + 20)
-        ctx.lineTo(x0 + 140, y0 + 30)
-        ctx.lineTo(x0 + 146, y0 + 56)
-        ctx.closePath(); ctx.fill()
-        ctx.fillStyle = '#bfd9d8'
-        ctx.beginPath()
-        ctx.moveTo(x0 + 34, y0 + 30)
-        ctx.lineTo(x0 + 56, y0 + 24)
-        ctx.lineTo(x0 + 90, y0 + 24)
-        ctx.lineTo(x0 + 96, y0 + 30)
-        ctx.lineTo(x0 + 96, y0 + 40)
-        ctx.lineTo(x0 + 34, y0 + 40)
-        ctx.closePath(); ctx.fill()
-        ctx.fillStyle = model.accent
-        ctx.fillRect(x0 + 18, y0 + 50, 116, 4)
-    }
-    else if(modelKey === 'truck')
-    {
-        ctx.fillStyle = model.body
-        roundRect(ctx, x0 + 4,   y0 + 16, 44, 40, 5); ctx.fill()
-        roundRect(ctx, x0 + 48,  y0 + 24, 96, 32, 4); ctx.fill()
-        ctx.fillStyle = '#bfd9d8'
-        roundRect(ctx, x0 + 10, y0 + 22, 32, 18, 3); ctx.fill()
-        ctx.fillStyle = model.accent
-        ctx.fillRect(x0 + 4, y0 + 50, 140, 6)
-    }
-    else
-    {
-        // sedan
-        ctx.fillStyle = model.body
-        ctx.beginPath()
-        ctx.moveTo(x0 + 6,   y0 + 56)
-        ctx.lineTo(x0 + 22,  y0 + 32)
-        ctx.lineTo(x0 + 38,  y0 + 24)
-        ctx.lineTo(x0 + 108, y0 + 24)
-        ctx.lineTo(x0 + 130, y0 + 32)
-        ctx.lineTo(x0 + 144, y0 + 56)
-        ctx.closePath(); ctx.fill()
-        ctx.fillStyle = '#bfd9d8'
-        ctx.beginPath()
-        ctx.moveTo(x0 + 28, y0 + 32)
-        ctx.lineTo(x0 + 44, y0 + 26)
-        ctx.lineTo(x0 + 102, y0 + 26)
-        ctx.lineTo(x0 + 118, y0 + 32)
-        ctx.lineTo(x0 + 118, y0 + 44)
-        ctx.lineTo(x0 + 28,  y0 + 44)
-        ctx.closePath(); ctx.fill()
-        ctx.fillStyle = model.accent
-        ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
+        case 'pickup':
+            // cab + bed
+            roundRect(ctx, x0 + 8,  y0 + 20, 60, 36, 6); ctx.fill()
+            roundRect(ctx, x0 + 64, y0 + 30, 78, 26, 4); ctx.fill()
+            ctx.fillStyle = win
+            roundRect(ctx, x0 + 16, y0 + 26, 46, 18, 4); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 8, y0 + 50, 134, 6)
+            break
+
+        case 'sports':
+            // low + raked
+            ctx.beginPath()
+            ctx.moveTo(x0 + 6,   y0 + 56)
+            ctx.lineTo(x0 + 26,  y0 + 26)
+            ctx.lineTo(x0 + 100, y0 + 22)
+            ctx.lineTo(x0 + 140, y0 + 32)
+            ctx.lineTo(x0 + 146, y0 + 56)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = win
+            ctx.beginPath()
+            ctx.moveTo(x0 + 34, y0 + 32)
+            ctx.lineTo(x0 + 56, y0 + 26)
+            ctx.lineTo(x0 + 90, y0 + 26)
+            ctx.lineTo(x0 + 96, y0 + 32)
+            ctx.lineTo(x0 + 96, y0 + 40)
+            ctx.lineTo(x0 + 34, y0 + 40)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 18, y0 + 50, 116, 4)
+            break
+
+        case 'truck':
+            // wide + boxy
+            roundRect(ctx, x0 + 4,   y0 + 16, 44, 40, 5); ctx.fill()
+            roundRect(ctx, x0 + 48,  y0 + 24, 96, 32, 4); ctx.fill()
+            ctx.fillStyle = win
+            roundRect(ctx, x0 + 10, y0 + 22, 32, 18, 3); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 4, y0 + 50, 140, 6)
+            break
+
+        case 'wagon':
+            // long roofline with rear box
+            ctx.beginPath()
+            ctx.moveTo(x0 + 6,   y0 + 56)
+            ctx.lineTo(x0 + 18,  y0 + 32)
+            ctx.lineTo(x0 + 32,  y0 + 22)
+            ctx.lineTo(x0 + 120, y0 + 22)
+            ctx.lineTo(x0 + 140, y0 + 32)
+            ctx.lineTo(x0 + 146, y0 + 56)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = win
+            roundRect(ctx, x0 + 26, y0 + 28, 100, 16, 3); ctx.fill()
+            // window divider (wagon middle pillar)
+            ctx.fillStyle = model.body
+            ctx.fillRect(x0 + 80, y0 + 28, 3, 16)
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 12, y0 + 50, 128, 4)
+            break
+
+        case 'classic':
+            // 1940s coupe — high curving fenders, separate cab
+            ctx.beginPath()
+            ctx.moveTo(x0 + 8,   y0 + 56)
+            ctx.bezierCurveTo(x0 + 6,  y0 + 36, x0 + 30, y0 + 30, x0 + 50, y0 + 30)
+            ctx.lineTo(x0 + 100, y0 + 30)
+            ctx.bezierCurveTo(x0 + 122, y0 + 30, x0 + 144, y0 + 36, x0 + 142, y0 + 56)
+            ctx.closePath(); ctx.fill()
+            // domed roof
+            ctx.beginPath()
+            ctx.moveTo(x0 + 42, y0 + 30)
+            ctx.bezierCurveTo(x0 + 50, y0 + 12, x0 + 100, y0 + 12, x0 + 108, y0 + 30)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = win
+            ctx.beginPath()
+            ctx.moveTo(x0 + 52, y0 + 28)
+            ctx.bezierCurveTo(x0 + 58, y0 + 16, x0 + 96, y0 + 16, x0 + 102, y0 + 28)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
+            // chrome grille
+            ctx.fillStyle = '#cccccc'
+            ctx.fillRect(x0 + carW - 18, y0 + 36, 12, 14)
+            break
+
+        case 'micro':
+            // Fiat 500 — short + bubbly
+            roundRect(ctx, x0 + 30, y0 + 20, 96, 36, 16); ctx.fill()
+            ctx.fillStyle = win
+            roundRect(ctx, x0 + 42, y0 + 24, 72, 18, 10); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 30, y0 + 50, 96, 6)
+            // visible canvas roof seam
+            ctx.fillStyle = 'rgba(0,0,0,0.25)'
+            ctx.fillRect(x0 + 78, y0 + 20, 2, 22)
+            break
+
+        default:   // sedan
+            ctx.beginPath()
+            ctx.moveTo(x0 + 6,   y0 + 56)
+            ctx.lineTo(x0 + 22,  y0 + 32)
+            ctx.lineTo(x0 + 38,  y0 + 24)
+            ctx.lineTo(x0 + 108, y0 + 24)
+            ctx.lineTo(x0 + 130, y0 + 32)
+            ctx.lineTo(x0 + 144, y0 + 56)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = win
+            ctx.beginPath()
+            ctx.moveTo(x0 + 28, y0 + 32)
+            ctx.lineTo(x0 + 44, y0 + 26)
+            ctx.lineTo(x0 + 102, y0 + 26)
+            ctx.lineTo(x0 + 118, y0 + 32)
+            ctx.lineTo(x0 + 118, y0 + 44)
+            ctx.lineTo(x0 + 28,  y0 + 44)
+            ctx.closePath(); ctx.fill()
+            ctx.fillStyle = model.accent
+            ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
     }
 
     // wheels (cream-on-black tire style)
-    const wheels = [
-        { x: x0 + 28,  y: y0 + 58 },
-        { x: x0 + 122, y: y0 + 58 },
-    ]
-    for(const w of wheels)
+    let wheelL = 28, wheelR = 122
+    if(model.shape === 'micro')   { wheelL = 46; wheelR = 110 }
+    if(model.shape === 'classic') { wheelL = 32; wheelR = 118 }
+    for(const wx of [wheelL, wheelR])
     {
         ctx.fillStyle = '#1a1a1a'
-        ctx.beginPath(); ctx.arc(w.x, w.y, 11, 0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(x0 + wx, y0 + 58, 11, 0, Math.PI * 2); ctx.fill()
         ctx.fillStyle = '#f7ecd2'
-        ctx.beginPath(); ctx.arc(w.x, w.y, 5,  0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(x0 + wx, y0 + 58, 5,  0, Math.PI * 2); ctx.fill()
     }
 
     // headlight

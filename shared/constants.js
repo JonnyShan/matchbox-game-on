@@ -137,19 +137,19 @@ export const COLLECT = {
   targetCount:      10,
   pickupRadius:     2.6,      // m — proximity for auto-collect
   pickupHeightZ:    1.0,      // float a meter above ground
-  // 10 fixed positions inside the 100×100 arena. Spread across cardinal
-  // quadrants + plateau + ramps to force movement.
+  // 10 fixed positions, each paired with a distinct car model key. Spread
+  // across cardinal quadrants + plateau + ramps to force movement.
   positions: [
-    { x:   0, y:   0, z: 2.6, model: 'pickup'   },  // plateau apex (highest value visually)
-    { x:  28, y:  28, z: 1.3, model: 'sedan'    },  // NE bowl
-    { x: -28, y:  35, z: 3.4, model: 'sports'   },  // NW stairs deck top
-    { x:  28, y: -36, z: 1.3, model: 'truck'    },  // SE kicker landing
-    { x: -28, y: -28, z: 2.9, model: 'pickup'   },  // SW spine
-    { x:   0, y:  35, z: 1.0, model: 'sedan'    },  // N corridor
-    { x:  35, y:   0, z: 1.0, model: 'sports'   },  // E corridor
-    { x: -35, y:   0, z: 1.0, model: 'pickup'   },  // W corridor
-    { x:  14, y: -16, z: 1.0, model: 'truck'    },  // mid south-east
-    { x: -14, y:  16, z: 1.0, model: 'sports'   },  // mid north-west
+    { x:   0, y:   0, z: 2.6, model: 'nissan_pickup'   },  // plateau apex
+    { x:  28, y:  28, z: 1.3, model: 'el_camino'       },  // NE bowl
+    { x: -28, y:  35, z: 3.4, model: 'dodge_challenger'},  // NW stairs deck top
+    { x:  28, y: -36, z: 1.3, model: 'ford_f150'       },  // SE kicker landing
+    { x: -28, y: -28, z: 2.9, model: 'plymouth_coupe'  },  // SW spine
+    { x:   0, y:  35, z: 1.0, model: 'volvo_240'       },  // N corridor
+    { x:  35, y:   0, z: 1.0, model: 'ford_mustang'    },  // E corridor
+    { x: -35, y:   0, z: 1.0, model: 'fiat_500'        },  // W corridor
+    { x:  14, y: -16, z: 1.0, model: 'bluebird_wagon'  },  // mid south-east
+    { x: -14, y:  16, z: 1.0, model: 'international'   },  // mid north-west
   ],
 }
 

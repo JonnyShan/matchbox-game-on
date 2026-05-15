@@ -81,11 +81,22 @@ export default class CollectHUD
                 <span id="collect-score" style="color:#f0c14b;font-weight:900;font-size:14px;letter-spacing:0;">0 / ${this.target}</span>
             </div>
             <div id="collect-slots" style="display:grid;grid-template-columns:repeat(${this.target}, 1fr);gap:4px;"></div>
+            <div id="collect-distance" style="margin-top:8px;text-align:right;font-size:10px;letter-spacing:2px;color:rgba(247,236,210,0.55);">
+                NEXT &nbsp;<span id="collect-distance-val" style="color:#f0c14b;font-weight:900;">--</span>
+            </div>
         `
         document.body.appendChild(root)
-        this._$slots = root.querySelector('#collect-slots')
-        this._$score = root.querySelector('#collect-score')
+        this._$slots    = root.querySelector('#collect-slots')
+        this._$score    = root.querySelector('#collect-score')
+        this._$distance = root.querySelector('#collect-distance-val')
         return root
+    }
+
+    setDistance(d)
+    {
+        if(!this._$distance) return
+        if(d === null || d === undefined) { this._$distance.textContent = 'DONE'; return }
+        this._$distance.textContent = `${Math.round(d)}m`
     }
 
     _renderSlots(pulse = false)
