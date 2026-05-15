@@ -392,8 +392,24 @@ export default class World
 
         if($btn) $btn.onclick = () => window.location.reload()
 
+        // Name input: pre-fill from saved name + repaint leaderboard live as user types
+        const $nameInput = document.getElementById('mb-result-name')
+        if($nameInput)
+        {
+            const initialName = this.network?.localPlayerName || localStorage.getItem('mb:playerName') || ''
+            $nameInput.value = initialName
+            $nameInput.oninput = () =>
+            {
+                const v = $nameInput.value.trim()
+                if(v) localStorage.setItem('mb:playerName', v)
+                const $row = $lb?.querySelector('li.me .lb-name')
+                if($row) $row.textContent = `${v || initialName || '???'} (you)`
+            }
+        }
+
         if($loading) $loading.style.display = 'none'
         $result.classList.add('visible')
+        $screen.classList.add('is-result')
         $screen.style.display = 'flex'
         $screen.style.opacity = '0'
         requestAnimationFrame(() =>

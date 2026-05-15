@@ -25,7 +25,8 @@ export default class EntryFlow
         this.config.soloMode   = false
         this.config.skipLobby  = true
         this.config.carType    = this.config.carType   || 'default'
-        this.config.playerName = this.config.playerName || this._autoName()
+        const savedName        = localStorage.getItem('mb:playerName')
+        this.config.playerName = this.config.playerName || savedName || this._autoName()
 
         // Restore previous color choice if any
         const saved = parseInt(localStorage.getItem('mb:carColor') ?? '', 10)
