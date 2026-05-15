@@ -32,6 +32,8 @@ import Killfeed from './Killfeed.js'
 import DamageNumbers from './DamageNumbers.js'
 import CollectPickups from './CollectPickups.js'
 import CollectHUD from './CollectHUD.js'
+import MatchTimer from './MatchTimer.js'
+import Confetti from './Confetti.js'
 import { CAR_COLORS } from '../../../../shared/constants.js'
 
 function escapeHtml(s)
@@ -180,6 +182,12 @@ export default class World
             collectPickups: this.collectPickups,
         })
 
+        // Match timer HUD (top-center) + pre-match countdown overlay
+        this.matchTimer = new MatchTimer({ network: this.network })
+
+        // Confetti emitter (canvas-based)
+        this.confetti = new Confetti()
+
         // Track my collected count for HUD
         this._myCollects = 0
         if(this.network)
@@ -190,6 +198,7 @@ export default class World
                 {
                     this._myCollects = score
                     this._flashCollect('+1', '#f0c14b')
+                    if(completed) this._triggerFinaleMoment()
                 }
                 else
                 {
@@ -215,7 +224,18 @@ export default class World
             const dt = Math.min(this.time.delta, 60)
             this.collectPickups.update(dt)
             this.collectHUD?.updateMinimap()
+            this.matchTimer?.update()
             this._updateCollectTimer()
+
+            // Block inputs during pre-match countdown so cars don't drive off
+            if(this.matchTimer?.isCountdown?.() && this.controls)
+            {
+                this.controls.actions.up = false
+                this.controls.actions.down = false
+                this.controls.actions.left = false
+                this.controls.actions.right = false
+                this.controls.actions.boost = false
+            }
         })
     }
 
@@ -304,6 +324,97 @@ export default class World
             const ss = String(s % 60).padStart(2, '0')
             $t.textContent = `${mm}:${ss}`
             if(s <= 10) $t.style.color = '#ffe066'
+        }
+    }
+
+    // Slow-mo + bloom flash + confetti when the local player grabs car #10.
+    // Plays ~900ms before the server's collect:finished arrives.
+    _triggerFinaleMoment()
+    {
+        if(this._finaleTriggered) return
+        this._finaleTriggered = true
+
+        // 1. Confetti burst from screen center
+        if(this.confetti) this.confetti.burst({ count: 280 })
+
+        // 2. Slow-mo: scale physics 1.0 → 0.25 over 80ms, hold 600ms, ramp back over 200ms
+        if(this.physics)
+        {
+            const start = Date.now()
+            const DOWN = 80, HOLD = 600, UP = 200
+            const tick = () =>
+            {
+                const t = Date.now() - start
+                if(t < DOWN)
+                    this.physics.timeScale = 1.0 - (t / DOWN) * 0.75
+                else if(t < DOWN + HOLD)
+                    this.physics.timeScale = 0.25
+                else if(t < DOWN + HOLD + UP)
+                    this.physics.timeScale = 0.25 + ((t - DOWN - HOLD) / UP) * 0.75
+                else
+                {
+                    this.physics.timeScale = 1.0
+                    return
+                }
+                requestAnimationFrame(tick)
+            }
+            tick()
+        }
+
+        // 3. White bloom flash via screen overlay
+        let $flash = document.getElementById('mb-finale-flash')
+        if(!$flash)
+        {
+            $flash = document.createElement('div')
+            $flash.id = 'mb-finale-flash'
+            $flash.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: radial-gradient(circle, rgba(247,236,210,0.9) 0%, rgba(240,193,75,0.6) 30%, rgba(0,0,0,0) 70%);
+                pointer-events: none;
+                z-index: 730;
+                opacity: 0;
+                transition: opacity 0.15s ease-out;
+            `
+            document.body.appendChild($flash)
+        }
+        $flash.style.transition = 'opacity 0.08s ease-out'
+        $flash.style.opacity = '0.95'
+        setTimeout(() =>
+        {
+            $flash.style.transition = 'opacity 0.7s ease-in'
+            $flash.style.opacity = '0'
+        }, 100)
+
+        // 4. Camera FOV punch (zoom in then back out)
+        if(this.camera?.instance)
+        {
+            const baseFov = this.camera.instance.fov
+            const start = Date.now()
+            const DUR = 700
+            const punch = () =>
+            {
+                const t = Math.min(1, (Date.now() - start) / DUR)
+                // ease in then out: zoom to 0.7x then back to 1.0x
+                const e = Math.sin(t * Math.PI)
+                this.camera.instance.fov = baseFov - e * 12
+                this.camera.instance.updateProjectionMatrix()
+                if(t < 1) requestAnimationFrame(punch)
+            }
+            punch()
+        }
+
+        // 5. Freeze local car inputs for the moment so player doesn't drive away
+        if(this.controls)
+        {
+            const saved = { ...this.controls.actions }
+            this.controls.actions.up = false
+            this.controls.actions.down = false
+            this.controls.actions.left = false
+            this.controls.actions.right = false
+            this.controls.actions.boost = false
+            this.controls._frozen = true
+            setTimeout(() => { this.controls._frozen = false }, 700)
         }
     }
 

@@ -26,9 +26,13 @@ export default class Physics
         this.setFloor()
         this.setCar()
 
+        // timeScale lets World inject slow-mo by scaling the physics step delta.
+        // Defaults to 1.0 (normal speed). Set via this.physics.timeScale = 0.3.
+        this.timeScale = 1.0
+
         this.time.on('tick', () =>
         {
-            this.world.step(this.time.delta / 1000)
+            this.world.step((this.time.delta / 1000) * this.timeScale)
         })
     }
 

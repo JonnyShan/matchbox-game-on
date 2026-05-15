@@ -19,8 +19,10 @@ export class CollectManager {
   }
 
   startMatch(now = Date.now()) {
-    this._matchStartAt = now
-    this._matchEndAt   = now + COLLECT.durationMs
+    // matchStartAt = when pickups go live (after countdown)
+    // matchEndAt   = matchStartAt + durationMs
+    this._matchStartAt = now + COLLECT.countdownMs
+    this._matchEndAt   = this._matchStartAt + COLLECT.durationMs
     this._winnerId     = null
     this._scores.clear()
     this._pickups = COLLECT.positions.map((p, i) => ({
@@ -35,8 +37,16 @@ export class CollectManager {
     }))
   }
 
+  // Pre-match countdown is live (before pickups go hot)
+  isCountdown(now = Date.now()) {
+    return this._matchStartAt !== null && now < this._matchStartAt
+  }
+
   isRunning(now = Date.now()) {
-    return this._matchStartAt !== null && now < this._matchEndAt && !this._winnerId
+    return this._matchStartAt !== null
+      && now >= this._matchStartAt
+      && now < this._matchEndAt
+      && !this._winnerId
   }
 
   remainingMs(now = Date.now()) {

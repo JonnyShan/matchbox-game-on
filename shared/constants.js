@@ -134,6 +134,7 @@ export const COMBAT = {
 // expires. Server is authoritative for pickup state, score, and timer.
 export const COLLECT = {
   durationMs:       60_000,   // 60s match
+  countdownMs:      3_000,    // 3-2-1-GO pre-match phase
   targetCount:      10,
   pickupRadius:     2.6,      // m — proximity for auto-collect
   pickupHeightZ:    1.0,      // float a meter above ground
