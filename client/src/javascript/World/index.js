@@ -32,7 +32,6 @@ import Killfeed from './Killfeed.js'
 import DamageNumbers from './DamageNumbers.js'
 import CollectPickups from './CollectPickups.js'
 import CollectHUD from './CollectHUD.js'
-import CollectArrow from './CollectArrow.js'
 import { CAR_COLORS } from '../../../../shared/constants.js'
 
 function escapeHtml(s)
@@ -172,14 +171,11 @@ export default class World
 
         // HUD elements
         this._buildCollectHUD()
-        // Top-right 10-car progress strip
-        this.collectHUD = new CollectHUD({ network: this.network })
-        // 3D arrow above player pointing to nearest uncollected pickup
-        this.collectArrow = new CollectArrow({
-            scene:          this.scene,
+        // Top-right slots + bottom-center minimap & compass arrow
+        this.collectHUD = new CollectHUD({
+            network:        this.network,
             physics:        this.physics,
             collectPickups: this.collectPickups,
-            hud:            this.collectHUD,
         })
 
         // Track my collected count for HUD
@@ -216,7 +212,7 @@ export default class World
         {
             const dt = Math.min(this.time.delta, 60)
             this.collectPickups.update(dt)
-            this.collectArrow?.update(dt)
+            this.collectHUD?.updateMinimap()
             this._updateCollectTimer()
         })
     }
