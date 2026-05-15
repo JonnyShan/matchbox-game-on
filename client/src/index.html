@@ -161,41 +161,133 @@
         }
         .lobby-dot.active { background: #fff; }
 
-        /* ── Loading screen ── */
+        /* ── Loading screen — full-bleed Matchbox box-art ── */
         #loading-screen {
             position: fixed;
             inset: 0;
-            background: #0a0a0a;
+            background: #0a1410;
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 2000;
             transition: opacity 0.6s;
-            font-family: 'Comic Neue', monospace;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow: hidden;
         }
         #loading-screen.fade-out { opacity: 0; pointer-events: none; }
-        #loading-content { text-align: center; color: #fff; width: 300px; }
-        #loading-title { font-size: 28px; font-weight: 700; letter-spacing: 1px; margin-bottom: 36px; }
+
+        #mb-boxart {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+            background: #0a1410;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* Loading-state overlay (bottom band with progress) */
+        #mb-loading-overlay {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 6%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 2;
+            pointer-events: none;
+        }
+        #mb-loading-label {
+            color: #f7ecd2;
+            font-weight: 900;
+            font-size: 14px;
+            letter-spacing: 6px;
+            text-shadow: 2px 2px 0 #1a1a1a, 0 4px 12px rgba(0,0,0,0.7);
+        }
         #loading-bar-track {
-            height: 3px;
-            background: #1e1e1e;
-            border-radius: 2px;
-            margin-bottom: 18px;
+            width: min(320px, 60vw);
+            height: 6px;
+            background: rgba(20,12,5,0.7);
+            border: 1px solid rgba(240,193,75,0.5);
+            border-radius: 4px;
             overflow: hidden;
         }
         #loading-bar-fill {
             height: 100%;
-            background: #fff;
             width: 0%;
-            border-radius: 2px;
+            background: linear-gradient(90deg, #ee3a2f 0%, #f0c14b 50%, #5fa83f 100%);
+            border-radius: 4px;
             transition: width 0.25s ease;
         }
-        #loading-tip {
+
+        /* Result-state overlay (win/lose card) */
+        #mb-result-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+        }
+        #mb-result-overlay.visible { display: flex; }
+        #mb-result-card {
+            background: rgba(20,12,5,0.95);
+            border: 4px solid #f0c14b;
+            border-radius: 18px;
+            padding: 28px 36px 32px;
+            color: #f7ecd2;
+            text-align: center;
+            font-family: 'Space Grotesk', sans-serif;
+            min-width: 320px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        }
+        #mb-result-eyebrow {
+            color: #f0c14b;
             font-size: 12px;
-            color: #555;
-            min-height: 18px;
-            transition: opacity 0.3s;
-            letter-spacing: 0.5px;
+            letter-spacing: 5px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        #mb-result-score {
+            font-size: 56px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            line-height: 1;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 0 #1a1a1a;
+        }
+        #mb-result-time {
+            font-size: 13px;
+            color: rgba(247,236,210,0.75);
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        #mb-result-btn {
+            background: linear-gradient(180deg, #ee3a2f 0%, #c92a22 100%);
+            color: #f7ecd2;
+            border: 3px solid #f7ecd2;
+            border-radius: 10px;
+            padding: 12px 28px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 900;
+            font-size: 14px;
+            letter-spacing: 3px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #6b1410;
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        #mb-result-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #6b1410;
+        }
+        #mb-result-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #6b1410;
         }
 
         /* ── Quick-play ── */
@@ -1127,16 +1219,33 @@
     <!-- ── Film grain overlay (above all REDLINE screens) ── -->
     <div id="redline-grain" class="rl-grain hidden" aria-hidden="true"></div>
 
-    <!-- ── Loading screen ── -->
+    <!-- ── Loading + result screen — actual Matchbox 'Game On' box-art ── -->
     <div id="loading-screen">
-        <div id="loading-content">
-            <div id="loading-title">MATCHBOX</div>
-            <div id="loading-subtitle">LOADING ASSETS</div>
+        <img id="mb-boxart"
+             src="./images/matchbox-game-on.png"
+             alt="Matchbox Game On — Mighty Ace Adventure Edition" />
+
+        <!-- Loading-state overlay (hidden once game starts) -->
+        <div id="mb-loading-overlay">
+            <div id="mb-loading-label">LOADING…</div>
             <div id="loading-bar-track">
                 <div id="loading-bar-fill"></div>
             </div>
-            <div id="loading-tip"></div>
         </div>
+
+        <!-- Result-state overlay (shown on win/lose) -->
+        <div id="mb-result-overlay">
+            <div id="mb-result-card">
+                <div id="mb-result-eyebrow">COLLECTION COMPLETE</div>
+                <div id="mb-result-score">10 / 10</div>
+                <div id="mb-result-time">in 42.6s — Mighty Ace unlocked</div>
+                <button id="mb-result-btn" type="button">PLAY AGAIN</button>
+            </div>
+        </div>
+
+        <!-- Legacy hidden hooks for Application.js -->
+        <div id="loading-tip"   style="display:none"></div>
+        <div id="loading-title" style="display:none"></div>
     </div>
 
     <!-- ── Lobby overlay ── -->

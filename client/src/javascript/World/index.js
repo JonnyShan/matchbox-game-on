@@ -153,6 +153,8 @@ export default class World
 
     setCollect()
     {
+        this._matchStartAt = Date.now()
+
         // Use server's pickup layout from room:joined
         this.collectPickups = new CollectPickups({
             scene:   this.scene,
@@ -307,39 +309,47 @@ export default class World
 
     _showCollectComplete({ youWon, winner, reason, scores })
     {
-        const $overlay = document.getElementById('race-complete')
-        if(!$overlay) return
+        // Re-show the Matchbox 'Game On' box-art screen as the win/lose canvas
+        const $screen   = document.getElementById('loading-screen')
+        const $loading  = document.getElementById('mb-loading-overlay')
+        const $result   = document.getElementById('mb-result-overlay')
+        const $eyebrow  = document.getElementById('mb-result-eyebrow')
+        const $score    = document.getElementById('mb-result-score')
+        const $time     = document.getElementById('mb-result-time')
+        const $btn      = document.getElementById('mb-result-btn')
+        if(!$screen || !$result) return
 
-        const $trophy = $overlay.querySelector('.rc-trophy')
-        const $title  = $overlay.querySelector('.rc-title')
-        const $sub    = document.getElementById('rc-sub')
-        const $list   = document.getElementById('rc-laps')
-        const $footer = document.getElementById('rc-footer')
+        const localId   = this.network?.localId
+        const me        = scores?.find(s => s.id === localId)
+        const myCount   = me?.count ?? this._myCollects ?? 0
+        const elapsedMs = me?.finishAt && this._matchStartAt
+            ? me.finishAt - this._matchStartAt
+            : (Date.now() - (this._matchStartAt || Date.now()))
+        const seconds   = Math.max(0, elapsedMs / 1000).toFixed(1)
 
-        if($trophy) $trophy.textContent = youWon ? '🏆' : '🎁'
-        if($title)  $title.textContent  = youWon ? 'COLLECTOR' : `${winner} WINS`
-        if($sub)    $sub.textContent    = reason === 'timer' ? 'Time expired' : 'All 10 collected'
-        if($list)
+        if($eyebrow)
         {
-            $list.innerHTML = ''
-            const sorted = [...scores].sort((a, b) => b.count - a.count)
-            sorted.forEach(s =>
-            {
-                const li = document.createElement('li')
-                li.className = 'rc-lap-row'
-                if(s.count >= 10) li.classList.add('rc-lap-best')
-                const num  = document.createElement('span'); num.className = 'rc-lap-num'; num.textContent = s.name
-                const time = document.createElement('span'); time.className = 'rc-lap-time'; time.textContent = `${s.count} / 10`
-                li.appendChild(num); li.appendChild(time)
-                $list.appendChild(li)
-            })
+            if(youWon)                  $eyebrow.textContent = 'COLLECTION COMPLETE'
+            else if(reason === 'timer') $eyebrow.textContent = 'TIME UP'
+            else                        $eyebrow.textContent = 'GAME OVER'
         }
-        if($footer) $footer.textContent = 'MATCHBOX COLLECT'
+        if($score) $score.textContent = `${myCount} / 10`
+        if($time)
+        {
+            if(youWon) $time.textContent = `in ${seconds}s — Mighty Ace Adventure Edition unlocked`
+            else       $time.textContent = `Winner: ${winner || '???'}`
+        }
+        if($btn) $btn.onclick = () => window.location.reload()
 
-        const $again = document.getElementById('rc-again')
-        if($again) $again.onclick = () => window.location.reload()
-
-        $overlay.classList.add('visible')
+        if($loading) $loading.style.display = 'none'
+        $result.classList.add('visible')
+        $screen.style.display = 'flex'
+        $screen.style.opacity = '0'
+        requestAnimationFrame(() =>
+        {
+            $screen.style.transition = 'opacity 0.6s'
+            $screen.style.opacity = '1'
+        })
     }
 
     setReveal()

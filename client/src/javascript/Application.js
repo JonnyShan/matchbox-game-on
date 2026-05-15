@@ -303,11 +303,19 @@ export default class Application
         this.resources.on('ready', () =>
         {
             clearInterval(tipInterval)
-            $fill.style.width = '100%'
+            if($fill) $fill.style.width = '100%'
             setTimeout(() =>
             {
                 $screen.classList.add('fade-out')
-                setTimeout(() => $screen.remove(), 700)
+                // Keep DOM alive — World.setCollect re-uses this screen as the win/lose overlay
+                setTimeout(() =>
+                {
+                    $screen.style.display = 'none'
+                    $screen.classList.remove('fade-out')
+                    $screen.style.opacity = ''
+                    const $loading = document.getElementById('mb-loading-overlay')
+                    if($loading) $loading.style.display = 'none'
+                }, 700)
             }, 400)
         })
     }
