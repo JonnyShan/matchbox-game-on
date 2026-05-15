@@ -184,6 +184,9 @@ export default class Application
 
     _initGame()
     {
+        // Fade out the Matchbox box-art loading screen
+        this._hideLoadingScreen()
+
         // Network already created in constructor — just spin up the lobby
         // and the World. Lobby uses the existing connection.
         this.lobbyUI = new LobbyUI({
@@ -304,20 +307,26 @@ export default class Application
         {
             clearInterval(tipInterval)
             if($fill) $fill.style.width = '100%'
-            setTimeout(() =>
-            {
-                $screen.classList.add('fade-out')
-                // Keep DOM alive — World.setCollect re-uses this screen as the win/lose overlay
-                setTimeout(() =>
-                {
-                    $screen.style.display = 'none'
-                    $screen.classList.remove('fade-out')
-                    $screen.style.opacity = ''
-                    const $loading = document.getElementById('mb-loading-overlay')
-                    if($loading) $loading.style.display = 'none'
-                }, 700)
-            }, 400)
+            const $label = document.getElementById('mb-loading-label')
+            if($label) $label.textContent = 'READY'
+            // Don't auto-fade — EntryFlow drives game start via _initGame,
+            // which calls _hideLoadingScreen() once the player picks a color.
         })
+    }
+
+    _hideLoadingScreen()
+    {
+        const $screen = document.getElementById('loading-screen')
+        if(!$screen) return
+        $screen.classList.add('fade-out')
+        setTimeout(() =>
+        {
+            $screen.style.display = 'none'
+            $screen.classList.remove('fade-out')
+            $screen.style.opacity = ''
+            const $loading = document.getElementById('mb-loading-overlay')
+            if($loading) $loading.style.display = 'none'
+        }, 700)
     }
 
     setWorld()

@@ -309,13 +309,13 @@ export default class World
 
     _showCollectComplete({ youWon, winner, reason, scores })
     {
-        // Re-show the Matchbox 'Game On' box-art screen as the win/lose canvas
         const $screen   = document.getElementById('loading-screen')
         const $loading  = document.getElementById('mb-loading-overlay')
         const $result   = document.getElementById('mb-result-overlay')
         const $eyebrow  = document.getElementById('mb-result-eyebrow')
         const $score    = document.getElementById('mb-result-score')
         const $time     = document.getElementById('mb-result-time')
+        const $lb       = document.getElementById('mb-result-leaderboard')
         const $btn      = document.getElementById('mb-result-btn')
         if(!$screen || !$result) return
 
@@ -339,6 +339,57 @@ export default class World
             if(youWon) $time.textContent = `in ${seconds}s — Mighty Ace Adventure Edition unlocked`
             else       $time.textContent = `Winner: ${winner || '???'}`
         }
+
+        // Leaderboard — sort by count desc, then earliest finishAt asc
+        if($lb && Array.isArray(scores))
+        {
+            const sorted = [...scores].sort((a, b) =>
+            {
+                if(b.count !== a.count) return b.count - a.count
+                const af = a.finishAt ?? Infinity
+                const bf = b.finishAt ?? Infinity
+                return af - bf
+            })
+            $lb.innerHTML = ''
+            const matchStart = this._matchStartAt || Date.now()
+            sorted.forEach((s, idx) =>
+            {
+                const li = document.createElement('li')
+                const isMe = s.id === localId
+                const isWinner = idx === 0
+                if(isMe)     li.classList.add('me')
+                if(isWinner) li.classList.add('winner')
+
+                const rank   = document.createElement('span')
+                const name   = document.createElement('span')
+                const count  = document.createElement('span')
+                const time   = document.createElement('span')
+                rank.className  = 'lb-rank'
+                name.className  = 'lb-name'
+                count.className = 'lb-count'
+                time.className  = 'lb-time'
+
+                rank.textContent  = idx === 0 ? '🏆' : `#${idx + 1}`
+                name.textContent  = `${s.name || '???'}${isMe ? ' (you)' : ''}`
+                count.textContent = `${s.count}/10`
+                if(s.finishAt)
+                {
+                    const t = Math.max(0, (s.finishAt - matchStart) / 1000)
+                    time.textContent = `${t.toFixed(1)}s`
+                }
+                else
+                {
+                    time.textContent = '—'
+                }
+
+                li.appendChild(rank)
+                li.appendChild(name)
+                li.appendChild(count)
+                li.appendChild(time)
+                $lb.appendChild(li)
+            })
+        }
+
         if($btn) $btn.onclick = () => window.location.reload()
 
         if($loading) $loading.style.display = 'none'

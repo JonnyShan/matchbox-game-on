@@ -1643,3 +1643,170 @@
 .mb-title .rl-grid-floor::before {
     opacity: 0.55;
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Color picker overlay (CHOOSE YOUR JEEP)
+   ───────────────────────────────────────────────────────────────── */
+#mb-color-picker {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    animation: mbPickerIn 0.35s ease-out both;
+}
+@keyframes mbPickerIn { from { opacity: 0; } to { opacity: 1; } }
+
+.mb-picker-card {
+    background: linear-gradient(180deg, #1a2a14 0%, #0d1709 100%);
+    border: 3px solid #f0c14b;
+    border-radius: 18px;
+    padding: 22px 28px 24px;
+    color: #f7ecd2;
+    text-align: center;
+    min-width: 360px;
+    max-width: 92vw;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+}
+.mb-picker-eyebrow {
+    color: #f0c14b;
+    font-size: 11px;
+    letter-spacing: 5px;
+    font-weight: 800;
+    margin-bottom: 2px;
+}
+.mb-picker-title {
+    font-size: 44px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    line-height: 1;
+    margin-bottom: 12px;
+    text-shadow: 3px 3px 0 #1a1a1a;
+}
+.mb-picker-preview {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto 14px;
+}
+.mb-picker-preview svg { width: 100%; height: auto; display: block; }
+
+.mb-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.mb-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    padding: 0;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.4);
+}
+.mb-swatch:hover { transform: scale(1.08); }
+.mb-swatch.selected {
+    border-color: #f0c14b;
+    transform: scale(1.12);
+    box-shadow: 0 0 0 2px rgba(247,236,210,0.4), inset 0 -4px 0 rgba(0,0,0,0.25), 0 4px 12px rgba(240,193,75,0.5);
+}
+
+.mb-picker-go {
+    width: 100%;
+    background: linear-gradient(180deg, #ee3a2f 0%, #c92a22 100%);
+    color: #f7ecd2;
+    border: 3px solid #f7ecd2;
+    border-radius: 10px;
+    padding: 12px 26px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 900;
+    font-size: 16px;
+    letter-spacing: 5px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 #6b1410;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.mb-picker-go:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 0 #6b1410;
+}
+.mb-picker-go:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #6b1410;
+}
+.mb-picker-hint {
+    margin-top: 12px;
+    font-size: 11px;
+    color: rgba(247,236,210,0.6);
+    letter-spacing: 1px;
+}
+.mb-picker-hint strong { color: #f0c14b; font-weight: 800; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Result-card leaderboard
+   ───────────────────────────────────────────────────────────────── */
+#mb-result-leaderboard {
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 12px 8px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 10px;
+    border: 1px solid rgba(240,193,75,0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 260px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+#mb-result-leaderboard li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: rgba(247,236,210,0.85);
+    background: rgba(247,236,210,0.04);
+}
+#mb-result-leaderboard li.me {
+    background: rgba(240,193,75,0.18);
+    border: 1px solid rgba(240,193,75,0.6);
+    color: #f7ecd2;
+    font-weight: 700;
+}
+#mb-result-leaderboard li.winner { color: #f0c14b; }
+#mb-result-leaderboard .lb-rank {
+    width: 24px;
+    text-align: center;
+    color: rgba(247,236,210,0.45);
+    font-weight: 900;
+}
+#mb-result-leaderboard li.me     .lb-rank { color: #f0c14b; }
+#mb-result-leaderboard li.winner .lb-rank { color: #f0c14b; }
+#mb-result-leaderboard .lb-name {
+    flex: 1;
+    text-align: left;
+    letter-spacing: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#mb-result-leaderboard .lb-count {
+    color: #f0c14b;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 0;
+}
+#mb-result-leaderboard .lb-time {
+    color: rgba(247,236,210,0.55);
+    font-size: 11px;
+    letter-spacing: 0;
+}
