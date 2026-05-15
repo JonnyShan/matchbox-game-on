@@ -5,119 +5,326 @@ import { COLLECT } from '../../../../shared/constants.js'
 // + a tall gold beacon beam so the pickup is visible from anywhere on the map.
 // Server is authoritative for collected state.
 
-const CARD_W = 2.4
-const CARD_H = 3.6
+const CARD_W = 2.8
+const CARD_H = 4.4
 const BEAM_HEIGHT = 14
 const BEAM_RADIUS = 0.55
 const BOB_AMP   = 0.25
 const BOB_SPEED = 0.0019
 
-const CAR_TINTS = {
-    pickup: '#5fa83f',
-    sedan:  '#3478c8',
-    sports: '#e54e34',
-    truck:  '#f0c14b',
+const CAR_MODELS = {
+    pickup: { name: "'62 NISSAN JUNIOR",   body: '#9bbf80', accent: '#7aa05f' },
+    sedan:  { name: "'68 BLUEBIRD WAGON",  body: '#4978c8', accent: '#3b65a8' },
+    sports: { name: "'70 DODGE CHALLENGER",body: '#e54e34', accent: '#b73a25' },
+    truck:  { name: "'75 INTERNATIONAL",    body: '#e09a1f', accent: '#b87c10' },
 }
 
-// Build a Matchbox-style blister-pack texture for the sprite face.
+// Build a Matchbox-style blister-pack texture matching the real toy packaging:
+// hanger tab, orange cardboard top, red MATCHBOX pill, road-trip side ribbon,
+// numbered marker, green window with road + tree backdrop, toy car silhouette,
+// white footer with car name.
 function makeBlisterTexture(modelKey)
 {
-    const W = 256, H = 384
+    const W = 384, H = 600
     const c = document.createElement('canvas')
     c.width = W; c.height = H
     const ctx = c.getContext('2d')
 
-    // Cardboard backer with grain
-    ctx.fillStyle = '#f3e9d2'
-    ctx.fillRect(0, 0, W, H)
-    for(let i = 0; i < 220; i++)
+    const model = CAR_MODELS[modelKey] || CAR_MODELS.pickup
+
+    // ── Hanger tab (top) ────────────────────────────────────────────────────
+    ctx.fillStyle = '#e8d59f'
+    ctx.fillRect(W * 0.36, 0, W * 0.28, 38)
+    // hanger hole
+    ctx.fillStyle = '#fff'
+    ctx.beginPath()
+    ctx.arc(W / 2, 18, 9, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+
+    // ── Orange/brown cardboard backer ──────────────────────────────────────
+    const cardTop = 38
+    const cardBot = H
+    const grad = ctx.createLinearGradient(0, cardTop, 0, cardBot)
+    grad.addColorStop(0,    '#c47538')
+    grad.addColorStop(0.45, '#a85a26')
+    grad.addColorStop(1,    '#8b4516')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, cardTop, W, cardBot - cardTop)
+
+    // grainy fibres
+    for(let i = 0; i < 320; i++)
     {
-        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(180,150,90,0.08)' : 'rgba(120,90,40,0.06)'
-        ctx.fillRect(Math.random() * W, Math.random() * H, 2, 1)
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,210,150,0.06)' : 'rgba(40,20,5,0.08)'
+        ctx.fillRect(Math.random() * W, cardTop + Math.random() * (cardBot - cardTop), 2, 1)
     }
 
-    // Top red header
-    ctx.fillStyle = '#d83a2f'
-    ctx.fillRect(0, 0, W, 90)
-    ctx.fillStyle = '#f0c14b'
-    ctx.fillRect(0, 86, W, 4)
-
-    ctx.fillStyle = '#f7ecd2'
-    ctx.font = '900 44px "Space Grotesk", sans-serif'
+    // ── METAL · PARTS · PIECES · TOOL strip near hanger ────────────────────
+    ctx.fillStyle = 'rgba(20,10,5,0.0)'
+    ctx.font = '600 9px "Space Grotesk", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('MATCHBOX', W / 2, 48)
-
-    // Window outline
-    ctx.strokeStyle = '#2a2a2a'
-    ctx.lineWidth = 4
-    ctx.strokeRect(28, 130, W - 56, 200)
-
-    // Forest backdrop inside window
-    const g = ctx.createLinearGradient(0, 130, 0, 330)
-    g.addColorStop(0,   '#bfd9c4')
-    g.addColorStop(0.6, '#7fae73')
-    g.addColorStop(1,   '#5a8a3e')
-    ctx.fillStyle = g
-    ctx.fillRect(30, 132, W - 60, 196)
-
-    // Tiny tree silhouettes
-    ctx.fillStyle = 'rgba(40, 70, 35, 0.55)'
-    for(let i = 0; i < 6; i++)
-    {
-        const tx = 40 + i * 30 + Math.random() * 8
-        const ty = 200 + Math.random() * 12
-        ctx.beginPath()
-        ctx.moveTo(tx, ty + 30)
-        ctx.lineTo(tx + 8, ty - 14)
-        ctx.lineTo(tx + 16, ty + 30)
-        ctx.closePath()
-        ctx.fill()
-    }
-
-    // Road strip
-    ctx.fillStyle = '#2a2a2a'
-    ctx.fillRect(30, 268, W - 60, 18)
     ctx.fillStyle = '#f7ecd2'
-    for(let i = 30; i < W - 30; i += 26) ctx.fillRect(i, 276, 12, 2)
+    ctx.fillText('METAL  ·  PARTS  ·  PIECES  ·  TOOL', W / 2, 56)
 
-    // Car silhouette tinted by model
-    const carColor = CAR_TINTS[modelKey] || CAR_TINTS.sedan
-    ctx.fillStyle = carColor
-    if(modelKey === 'pickup' || modelKey === 'truck')
-    {
-        ctx.fillRect(78, 232, 50, 32)
-        ctx.fillRect(128, 244, 70, 20)
-    }
-    else if(modelKey === 'sports')
-    {
-        ctx.beginPath()
-        ctx.moveTo(74, 264); ctx.lineTo(102, 232)
-        ctx.lineTo(160, 232); ctx.lineTo(190, 264)
-        ctx.closePath(); ctx.fill()
-    }
-    else
-    {
-        ctx.fillRect(80, 240, 110, 24)
-        ctx.beginPath()
-        ctx.moveTo(96, 240); ctx.lineTo(108, 222)
-        ctx.lineTo(168, 222); ctx.lineTo(184, 240)
-        ctx.closePath(); ctx.fill()
-    }
-    ctx.fillStyle = '#1a1a1a'
-    ctx.beginPath(); ctx.arc(96,  274, 9, 0, Math.PI * 2); ctx.fill()
-    ctx.beginPath(); ctx.arc(178, 274, 9, 0, Math.PI * 2); ctx.fill()
+    // ── Tiny round badge "Metal/Plastic" left ──────────────────────────────
+    ctx.beginPath()
+    ctx.arc(40, 90, 26, 0, Math.PI * 2)
+    ctx.fillStyle = '#f7ecd2'
+    ctx.fill()
+    ctx.strokeStyle = '#8b4516'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.fillStyle = '#8b4516'
+    ctx.font = '900 14px "Space Grotesk", sans-serif'
+    ctx.fillText('METAL', 40, 88)
 
-    // Footer
+    // ── Red MATCHBOX logo pill ─────────────────────────────────────────────
+    const pillX = 78, pillY = 76, pillW = 240, pillH = 56
     ctx.fillStyle = '#d83a2f'
-    ctx.fillRect(0, H - 50, W, 50)
+    roundRect(ctx, pillX, pillY, pillW, pillH, 12)
+    ctx.fill()
+    ctx.strokeStyle = '#f7ecd2'
+    ctx.lineWidth = 4
+    ctx.stroke()
+    // gold underline
+    ctx.fillStyle = '#f0c14b'
+    ctx.fillRect(pillX + 16, pillY + pillH - 8, pillW - 32, 4)
+    // wordmark
     ctx.fillStyle = '#f7ecd2'
-    ctx.font = '700 22px "Space Grotesk", sans-serif'
-    ctx.fillText(modelKey.toUpperCase(), W / 2, H - 25)
+    ctx.font = '900 36px "Space Grotesk", sans-serif'
+    ctx.fillText('MATCHBOX', pillX + pillW / 2, pillY + pillH / 2 + 2)
+
+    // ── Side ROAD TRIP ribbon (right edge) ─────────────────────────────────
+    ctx.save()
+    ctx.translate(W - 56, 200)
+    ctx.fillStyle = '#d83a2f'
+    ctx.fillRect(0, 0, 50, 110)
+    // arrow notch on bottom
+    ctx.beginPath()
+    ctx.moveTo(0, 110); ctx.lineTo(25, 134); ctx.lineTo(50, 110)
+    ctx.closePath(); ctx.fill()
+    ctx.fillStyle = '#f7ecd2'
+    ctx.font = '900 13px "Space Grotesk", sans-serif'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('MBX', 25, 22)
+    ctx.fillText('ROAD', 25, 50)
+    ctx.fillText('TRIP', 25, 70)
+    // small badge circle
+    ctx.beginPath(); ctx.arc(25, 94, 11, 0, Math.PI * 2)
+    ctx.fillStyle = '#f0c14b'; ctx.fill()
+    ctx.restore()
+
+    // ── Number marker (right side) ─────────────────────────────────────────
+    ctx.fillStyle = '#f7ecd2'
+    ctx.font = '900 16px "Space Grotesk", sans-serif'
+    ctx.textAlign = 'center'
+    const num = 1 + Math.abs(hashKey(modelKey + W) % 35)
+    ctx.fillText(`${num}`,  W - 30, 360)
+    ctx.fillText('—',       W - 30, 374)
+    ctx.fillText('35',      W - 30, 390)
+
+    // ── Green road-trip window backdrop ────────────────────────────────────
+    const winX = 38, winY = 160, winW = W - 76 - 56, winH = 240
+    const winGrad = ctx.createLinearGradient(0, winY, 0, winY + winH)
+    winGrad.addColorStop(0,    '#bfd9c4')
+    winGrad.addColorStop(0.5,  '#7fae73')
+    winGrad.addColorStop(1,    '#4f7a3e')
+    ctx.fillStyle = winGrad
+    ctx.fillRect(winX, winY, winW, winH)
+    // window outline
+    ctx.strokeStyle = '#2a1d0a'
+    ctx.lineWidth = 3
+    ctx.strokeRect(winX, winY, winW, winH)
+
+    // distant trees
+    ctx.fillStyle = 'rgba(35, 60, 30, 0.85)'
+    for(let i = 0; i < 12; i++)
+    {
+        const tx = winX + (i + 0.5) * (winW / 12) + (Math.random() - 0.5) * 6
+        const th = 30 + Math.random() * 22
+        const ty = winY + 80
+        ctx.beginPath()
+        ctx.moveTo(tx, ty + th)
+        ctx.lineTo(tx + 10, ty)
+        ctx.lineTo(tx + 20, ty + th)
+        ctx.closePath(); ctx.fill()
+    }
+    // road curving across
+    ctx.fillStyle = '#2a2a2a'
+    ctx.beginPath()
+    ctx.moveTo(winX,        winY + winH - 30)
+    ctx.bezierCurveTo(winX + winW * 0.3, winY + winH - 90,
+                      winX + winW * 0.65, winY + winH - 50,
+                      winX + winW,        winY + winH - 20)
+    ctx.lineTo(winX + winW, winY + winH)
+    ctx.lineTo(winX,        winY + winH)
+    ctx.closePath(); ctx.fill()
+    // road centre line dashes
+    ctx.fillStyle = '#f7ecd2'
+    for(let i = 0; i < 8; i++)
+    {
+        const dx = winX + 20 + i * 30
+        const dy = winY + winH - 26 - i * 6
+        ctx.fillRect(dx, dy, 14, 3)
+    }
+
+    // ── Toy car drawn on top of the road, large + detailed ────────────────
+    drawCar(ctx, winX + winW * 0.42, winY + winH - 60, model, modelKey)
+
+    // ── Blister bubble highlight (subtle gloss) ────────────────────────────
+    ctx.fillStyle = 'rgba(255,255,255,0.07)'
+    ctx.beginPath()
+    ctx.ellipse(winX + winW / 2, winY + winH * 0.55, winW * 0.42, winH * 0.45, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // ── White footer with car name ─────────────────────────────────────────
+    const footerY = winY + winH + 12
+    ctx.fillStyle = '#f7ecd2'
+    ctx.fillRect(winX, footerY, winW, 40)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.font = '900 18px "Space Grotesk", sans-serif'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(model.name, winX + winW / 2, footerY + 20)
+
+    // ── Subtle drop-shadow band at bottom ──────────────────────────────────
+    const bgrad = ctx.createLinearGradient(0, H - 60, 0, H)
+    bgrad.addColorStop(0, 'rgba(0,0,0,0)')
+    bgrad.addColorStop(1, 'rgba(0,0,0,0.45)')
+    ctx.fillStyle = bgrad
+    ctx.fillRect(0, H - 60, W, 60)
 
     const tex = new THREE.CanvasTexture(c)
     tex.minFilter = THREE.LinearFilter
     return tex
+}
+
+// Rounded-rect helper (canvas).
+function roundRect(ctx, x, y, w, h, r)
+{
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.arcTo(x + w, y,     x + w, y + h, r)
+    ctx.arcTo(x + w, y + h, x,     y + h, r)
+    ctx.arcTo(x,     y + h, x,     y,     r)
+    ctx.arcTo(x,     y,     x + w, y,     r)
+    ctx.closePath()
+}
+
+// Deterministic key → small int
+function hashKey(s)
+{
+    let h = 0
+    for(let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
+    return h
+}
+
+// Draw a stylized toy car silhouette at (cx, cy), scaled by model type.
+function drawCar(ctx, cx, cy, model, modelKey)
+{
+    const carW = 150, carH = 70
+    const x0 = cx - carW / 2, y0 = cy - carH
+
+    ctx.save()
+    // shadow under car
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    ctx.beginPath()
+    ctx.ellipse(cx, cy + 6, carW * 0.45, 7, 0, 0, Math.PI * 2)
+    ctx.fill()
+
+    if(modelKey === 'pickup')
+    {
+        // cab
+        ctx.fillStyle = model.body
+        roundRect(ctx, x0 + 8,  y0 + 20, 60, 36, 6); ctx.fill()
+        // bed
+        roundRect(ctx, x0 + 64, y0 + 30, 78, 26, 4); ctx.fill()
+        // window
+        ctx.fillStyle = '#bfd9d8'
+        roundRect(ctx, x0 + 16, y0 + 26, 46, 18, 4); ctx.fill()
+        // accent stripe
+        ctx.fillStyle = model.accent
+        ctx.fillRect(x0 + 8, y0 + 50, 134, 6)
+    }
+    else if(modelKey === 'sports')
+    {
+        ctx.fillStyle = model.body
+        ctx.beginPath()
+        ctx.moveTo(x0 + 6,   y0 + 56)
+        ctx.lineTo(x0 + 26,  y0 + 24)
+        ctx.lineTo(x0 + 100, y0 + 20)
+        ctx.lineTo(x0 + 140, y0 + 30)
+        ctx.lineTo(x0 + 146, y0 + 56)
+        ctx.closePath(); ctx.fill()
+        ctx.fillStyle = '#bfd9d8'
+        ctx.beginPath()
+        ctx.moveTo(x0 + 34, y0 + 30)
+        ctx.lineTo(x0 + 56, y0 + 24)
+        ctx.lineTo(x0 + 90, y0 + 24)
+        ctx.lineTo(x0 + 96, y0 + 30)
+        ctx.lineTo(x0 + 96, y0 + 40)
+        ctx.lineTo(x0 + 34, y0 + 40)
+        ctx.closePath(); ctx.fill()
+        ctx.fillStyle = model.accent
+        ctx.fillRect(x0 + 18, y0 + 50, 116, 4)
+    }
+    else if(modelKey === 'truck')
+    {
+        ctx.fillStyle = model.body
+        roundRect(ctx, x0 + 4,   y0 + 16, 44, 40, 5); ctx.fill()
+        roundRect(ctx, x0 + 48,  y0 + 24, 96, 32, 4); ctx.fill()
+        ctx.fillStyle = '#bfd9d8'
+        roundRect(ctx, x0 + 10, y0 + 22, 32, 18, 3); ctx.fill()
+        ctx.fillStyle = model.accent
+        ctx.fillRect(x0 + 4, y0 + 50, 140, 6)
+    }
+    else
+    {
+        // sedan
+        ctx.fillStyle = model.body
+        ctx.beginPath()
+        ctx.moveTo(x0 + 6,   y0 + 56)
+        ctx.lineTo(x0 + 22,  y0 + 32)
+        ctx.lineTo(x0 + 38,  y0 + 24)
+        ctx.lineTo(x0 + 108, y0 + 24)
+        ctx.lineTo(x0 + 130, y0 + 32)
+        ctx.lineTo(x0 + 144, y0 + 56)
+        ctx.closePath(); ctx.fill()
+        ctx.fillStyle = '#bfd9d8'
+        ctx.beginPath()
+        ctx.moveTo(x0 + 28, y0 + 32)
+        ctx.lineTo(x0 + 44, y0 + 26)
+        ctx.lineTo(x0 + 102, y0 + 26)
+        ctx.lineTo(x0 + 118, y0 + 32)
+        ctx.lineTo(x0 + 118, y0 + 44)
+        ctx.lineTo(x0 + 28,  y0 + 44)
+        ctx.closePath(); ctx.fill()
+        ctx.fillStyle = model.accent
+        ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
+    }
+
+    // wheels (cream-on-black tire style)
+    const wheels = [
+        { x: x0 + 28,  y: y0 + 58 },
+        { x: x0 + 122, y: y0 + 58 },
+    ]
+    for(const w of wheels)
+    {
+        ctx.fillStyle = '#1a1a1a'
+        ctx.beginPath(); ctx.arc(w.x, w.y, 11, 0, Math.PI * 2); ctx.fill()
+        ctx.fillStyle = '#f7ecd2'
+        ctx.beginPath(); ctx.arc(w.x, w.y, 5,  0, Math.PI * 2); ctx.fill()
+    }
+
+    // headlight
+    ctx.fillStyle = '#fff5c2'
+    ctx.beginPath(); ctx.arc(x0 + carW - 6, y0 + 44, 3, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
 }
 
 // Build the tall vertical gold light-beam used to make pickups findable.

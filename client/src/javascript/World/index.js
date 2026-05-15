@@ -31,6 +31,7 @@ import Mines from './Mines.js'
 import Killfeed from './Killfeed.js'
 import DamageNumbers from './DamageNumbers.js'
 import CollectPickups from './CollectPickups.js'
+import CollectHUD from './CollectHUD.js'
 import { CAR_COLORS } from '../../../../shared/constants.js'
 
 function escapeHtml(s)
@@ -170,6 +171,8 @@ export default class World
 
         // HUD elements
         this._buildCollectHUD()
+        // Top-right 10-car progress strip
+        this.collectHUD = new CollectHUD({ network: this.network })
 
         // Track my collected count for HUD
         this._myCollects = 0
