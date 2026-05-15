@@ -235,29 +235,40 @@
         }
         #mb-result-overlay.visible { display: flex; }
 
-        /* When result is visible, restructure parent as two-column layout */
+        /* When result is visible, restructure parent as two-column 50/50 layout */
         #loading-screen.is-result {
             background: linear-gradient(180deg, #1a2a14 0%, #0d1709 100%);
+            flex-direction: row;
+            align-items: stretch;
+            justify-content: stretch;
+            padding: 0;
         }
         #loading-screen.is-result #mb-boxart {
-            position: absolute;
-            top: 50%;
-            left: 5%;
-            transform: translateY(-50%);
-            width: 42vw;
-            height: auto;
-            max-height: 92vh;
+            position: relative;
+            inset: auto;
+            flex: 0 0 50%;
+            width: 50%;
+            height: 100vh;
+            max-height: none;
             object-fit: contain;
+            object-position: center;
             background: transparent;
-            border-radius: 12px;
-            box-shadow: 0 16px 48px rgba(0,0,0,0.65);
-            inset: auto auto auto 5%;
+            padding: 24px;
+            box-sizing: border-box;
             z-index: 2;
         }
         #loading-screen.is-result #mb-result-overlay {
-            justify-content: flex-end;
-            padding-right: 5vw;
+            position: relative;
+            inset: auto;
+            flex: 0 0 50%;
+            width: 50%;
+            height: 100vh;
+            padding: 24px;
+            box-sizing: border-box;
             background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #mb-result-card {
@@ -355,22 +366,21 @@
             #loading-screen.is-result {
                 flex-direction: column;
                 overflow-y: auto;
+                height: auto;
+                min-height: 100vh;
             }
             #loading-screen.is-result #mb-boxart {
-                position: relative;
-                top: auto; left: auto;
-                transform: none;
-                inset: auto;
-                width: 80vw;
-                max-width: 360px;
-                margin: 16px auto 8px;
-                max-height: 38vh;
+                flex: 0 0 auto;
+                width: 100%;
+                height: auto;
+                max-height: 42vh;
+                padding: 16px;
             }
             #loading-screen.is-result #mb-result-overlay {
-                position: relative;
-                inset: auto;
+                flex: 0 0 auto;
+                width: 100%;
+                height: auto;
                 padding: 0 16px 24px;
-                justify-content: center;
             }
             #mb-result-card { min-width: 0; width: 100%; max-width: 420px; }
         }
