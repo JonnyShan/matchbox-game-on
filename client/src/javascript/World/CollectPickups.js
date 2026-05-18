@@ -45,10 +45,13 @@ const BRAND_BADGES = {
 // white footer with car name.
 function makeBlisterTexture(modelKey)
 {
-    const W = 384, H = 600
+    const W = 512, H = 800
     const c = document.createElement('canvas')
     c.width = W; c.height = H
     const ctx = c.getContext('2d')
+    // Scale all the layout numbers (originally laid out at 384x600) by 4/3
+    // so the higher-res canvas keeps proportions while sharpening detail.
+    ctx.scale(W / 384, H / 600)
 
     const model = CAR_MODELS[modelKey] || CAR_MODELS.nissan_pickup
 
@@ -245,159 +248,372 @@ function hashKey(s)
     return h
 }
 
-// Draw a stylized toy car silhouette at (cx, cy), branched by model.shape.
+// Color util — lerp a hex toward black/white by factor (-1..1).
+function shadeHex(hex, lum)
+{
+    let h = hex.replace('#', '')
+    if(h.length === 3) h = h.split('').map(c => c + c).join('')
+    const num = parseInt(h, 16)
+    const r = Math.max(0, Math.min(255, Math.round(((num >> 16) & 0xff) * (1 + lum))))
+    const g = Math.max(0, Math.min(255, Math.round(((num >>  8) & 0xff) * (1 + lum))))
+    const b = Math.max(0, Math.min(255, Math.round(( num        & 0xff) * (1 + lum))))
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
+}
+
+// Draw a high-detail die-cast toy car silhouette at (cx, cy).
+// Detail layers per shape: rocker shadow, 3-stop body gradient, window with
+// reflection stripe, chrome bumpers, alloy wheels w/ 5 spokes, headlights with
+// halo, headlamps + grille slats, roof rack (where applicable).
 function drawCar(ctx, cx, cy, model)
 {
-    const carW = 150, carH = 70
+    const carW = 156, carH = 76
     const x0 = cx - carW / 2, y0 = cy - carH
-    const win = model.window || '#bfd9d8'
+    const win  = model.window || '#bfd9d8'
+    const dark = shadeHex(model.body, -0.32)
+    const lite = shadeHex(model.body,  0.22)
+    const acc  = model.accent || dark
+    const stroke = '#15110a'
 
     ctx.save()
-    // ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    ctx.lineJoin = 'round'
+    ctx.lineCap  = 'round'
+
+    // ── Ground shadow ──────────────────────────────────────────────────────
+    const shGrad = ctx.createRadialGradient(cx, cy + 7, 4, cx, cy + 7, carW * 0.5)
+    shGrad.addColorStop(0,   'rgba(0,0,0,0.55)')
+    shGrad.addColorStop(0.6, 'rgba(0,0,0,0.25)')
+    shGrad.addColorStop(1,   'rgba(0,0,0,0)')
+    ctx.fillStyle = shGrad
     ctx.beginPath()
-    ctx.ellipse(cx, cy + 6, carW * 0.45, 7, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx, cy + 7, carW * 0.5, 9, 0, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.fillStyle = model.body
+    // ── Body gradient (top brighter, mid base, bottom darker) ──────────────
+    const bodyGrad = ctx.createLinearGradient(0, y0 + 12, 0, y0 + carH)
+    bodyGrad.addColorStop(0,    lite)
+    bodyGrad.addColorStop(0.45, model.body)
+    bodyGrad.addColorStop(1,    dark)
+
+    // Per-shape silhouette path (also used for clipping window glass etc.)
+    const path = new Path2D()
 
     switch(model.shape)
     {
         case 'pickup':
-            // cab + bed
-            roundRect(ctx, x0 + 8,  y0 + 20, 60, 36, 6); ctx.fill()
-            roundRect(ctx, x0 + 64, y0 + 30, 78, 26, 4); ctx.fill()
-            ctx.fillStyle = win
-            roundRect(ctx, x0 + 16, y0 + 26, 46, 18, 4); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 8, y0 + 50, 134, 6)
+            // cab: x0+8..x0+68 ; bed: x0+64..x0+148
+            path.moveTo(x0 + 6,  y0 + 56)
+            path.lineTo(x0 + 8,  y0 + 36)
+            path.bezierCurveTo(x0 + 12, y0 + 22, x0 + 22, y0 + 18, x0 + 32, y0 + 18)
+            path.lineTo(x0 + 62, y0 + 18)
+            path.bezierCurveTo(x0 + 70, y0 + 18, x0 + 72, y0 + 28, x0 + 76, y0 + 32)
+            path.lineTo(x0 + 138, y0 + 32)
+            path.bezierCurveTo(x0 + 146, y0 + 32, x0 + 150, y0 + 36, x0 + 150, y0 + 42)
+            path.lineTo(x0 + 150, y0 + 56)
+            path.closePath()
             break
 
         case 'sports':
-            // low + raked
-            ctx.beginPath()
-            ctx.moveTo(x0 + 6,   y0 + 56)
-            ctx.lineTo(x0 + 26,  y0 + 26)
-            ctx.lineTo(x0 + 100, y0 + 22)
-            ctx.lineTo(x0 + 140, y0 + 32)
-            ctx.lineTo(x0 + 146, y0 + 56)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = win
-            ctx.beginPath()
-            ctx.moveTo(x0 + 34, y0 + 32)
-            ctx.lineTo(x0 + 56, y0 + 26)
-            ctx.lineTo(x0 + 90, y0 + 26)
-            ctx.lineTo(x0 + 96, y0 + 32)
-            ctx.lineTo(x0 + 96, y0 + 40)
-            ctx.lineTo(x0 + 34, y0 + 40)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 18, y0 + 50, 116, 4)
+            path.moveTo(x0 + 4,   y0 + 58)
+            path.bezierCurveTo(x0 + 4,  y0 + 36, x0 + 18, y0 + 30, x0 + 30, y0 + 28)
+            path.lineTo(x0 + 50,  y0 + 22)
+            path.lineTo(x0 + 100, y0 + 20)
+            path.bezierCurveTo(x0 + 120, y0 + 20, x0 + 140, y0 + 30, x0 + 152, y0 + 40)
+            path.lineTo(x0 + 152, y0 + 58)
+            path.closePath()
             break
 
         case 'truck':
-            // wide + boxy
-            roundRect(ctx, x0 + 4,   y0 + 16, 44, 40, 5); ctx.fill()
-            roundRect(ctx, x0 + 48,  y0 + 24, 96, 32, 4); ctx.fill()
-            ctx.fillStyle = win
-            roundRect(ctx, x0 + 10, y0 + 22, 32, 18, 3); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 4, y0 + 50, 140, 6)
+            // detailed offroad truck — chunky proportions
+            path.moveTo(x0 + 2,   y0 + 56)
+            path.lineTo(x0 + 2,   y0 + 18)
+            path.bezierCurveTo(x0 + 2,  y0 + 14, x0 + 8,  y0 + 12, x0 + 14, y0 + 12)
+            path.lineTo(x0 + 48,  y0 + 12)
+            path.bezierCurveTo(x0 + 54, y0 + 12, x0 + 56, y0 + 18, x0 + 60, y0 + 22)
+            path.lineTo(x0 + 140, y0 + 22)
+            path.bezierCurveTo(x0 + 148, y0 + 22, x0 + 154, y0 + 26, x0 + 154, y0 + 32)
+            path.lineTo(x0 + 154, y0 + 56)
+            path.closePath()
             break
 
         case 'wagon':
-            // long roofline with rear box
-            ctx.beginPath()
-            ctx.moveTo(x0 + 6,   y0 + 56)
-            ctx.lineTo(x0 + 18,  y0 + 32)
-            ctx.lineTo(x0 + 32,  y0 + 22)
-            ctx.lineTo(x0 + 120, y0 + 22)
-            ctx.lineTo(x0 + 140, y0 + 32)
-            ctx.lineTo(x0 + 146, y0 + 56)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = win
-            roundRect(ctx, x0 + 26, y0 + 28, 100, 16, 3); ctx.fill()
-            // window divider (wagon middle pillar)
-            ctx.fillStyle = model.body
-            ctx.fillRect(x0 + 80, y0 + 28, 3, 16)
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 12, y0 + 50, 128, 4)
+            path.moveTo(x0 + 4,   y0 + 56)
+            path.lineTo(x0 + 6,   y0 + 32)
+            path.bezierCurveTo(x0 + 10, y0 + 22, x0 + 22, y0 + 18, x0 + 36, y0 + 18)
+            path.lineTo(x0 + 124, y0 + 18)
+            path.bezierCurveTo(x0 + 138, y0 + 18, x0 + 148, y0 + 22, x0 + 152, y0 + 30)
+            path.lineTo(x0 + 152, y0 + 56)
+            path.closePath()
             break
 
         case 'classic':
-            // 1940s coupe — high curving fenders, separate cab
-            ctx.beginPath()
-            ctx.moveTo(x0 + 8,   y0 + 56)
-            ctx.bezierCurveTo(x0 + 6,  y0 + 36, x0 + 30, y0 + 30, x0 + 50, y0 + 30)
-            ctx.lineTo(x0 + 100, y0 + 30)
-            ctx.bezierCurveTo(x0 + 122, y0 + 30, x0 + 144, y0 + 36, x0 + 142, y0 + 56)
-            ctx.closePath(); ctx.fill()
-            // domed roof
-            ctx.beginPath()
-            ctx.moveTo(x0 + 42, y0 + 30)
-            ctx.bezierCurveTo(x0 + 50, y0 + 12, x0 + 100, y0 + 12, x0 + 108, y0 + 30)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = win
-            ctx.beginPath()
-            ctx.moveTo(x0 + 52, y0 + 28)
-            ctx.bezierCurveTo(x0 + 58, y0 + 16, x0 + 96, y0 + 16, x0 + 102, y0 + 28)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
-            // chrome grille
-            ctx.fillStyle = '#cccccc'
-            ctx.fillRect(x0 + carW - 18, y0 + 36, 12, 14)
+            path.moveTo(x0 + 6,   y0 + 58)
+            path.bezierCurveTo(x0 + 4,  y0 + 38, x0 + 22, y0 + 32, x0 + 36, y0 + 32)
+            path.lineTo(x0 + 116, y0 + 32)
+            path.bezierCurveTo(x0 + 134, y0 + 32, x0 + 152, y0 + 38, x0 + 150, y0 + 58)
+            path.closePath()
             break
 
         case 'micro':
-            // Fiat 500 — short + bubbly
-            roundRect(ctx, x0 + 30, y0 + 20, 96, 36, 16); ctx.fill()
-            ctx.fillStyle = win
-            roundRect(ctx, x0 + 42, y0 + 24, 72, 18, 10); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 30, y0 + 50, 96, 6)
-            // visible canvas roof seam
-            ctx.fillStyle = 'rgba(0,0,0,0.25)'
-            ctx.fillRect(x0 + 78, y0 + 20, 2, 22)
+            path.moveTo(x0 + 30, y0 + 58)
+            path.bezierCurveTo(x0 + 26, y0 + 38, x0 + 30, y0 + 22, x0 + 48, y0 + 18)
+            path.bezierCurveTo(x0 + 80, y0 + 14, x0 + 108, y0 + 18, x0 + 124, y0 + 22)
+            path.bezierCurveTo(x0 + 132, y0 + 28, x0 + 132, y0 + 50, x0 + 126, y0 + 58)
+            path.closePath()
             break
 
         default:   // sedan
-            ctx.beginPath()
-            ctx.moveTo(x0 + 6,   y0 + 56)
-            ctx.lineTo(x0 + 22,  y0 + 32)
-            ctx.lineTo(x0 + 38,  y0 + 24)
-            ctx.lineTo(x0 + 108, y0 + 24)
-            ctx.lineTo(x0 + 130, y0 + 32)
-            ctx.lineTo(x0 + 144, y0 + 56)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = win
-            ctx.beginPath()
-            ctx.moveTo(x0 + 28, y0 + 32)
-            ctx.lineTo(x0 + 44, y0 + 26)
-            ctx.lineTo(x0 + 102, y0 + 26)
-            ctx.lineTo(x0 + 118, y0 + 32)
-            ctx.lineTo(x0 + 118, y0 + 44)
-            ctx.lineTo(x0 + 28,  y0 + 44)
-            ctx.closePath(); ctx.fill()
-            ctx.fillStyle = model.accent
-            ctx.fillRect(x0 + 14, y0 + 50, 124, 4)
+            path.moveTo(x0 + 4,   y0 + 56)
+            path.bezierCurveTo(x0 + 6,  y0 + 36, x0 + 18, y0 + 30, x0 + 30, y0 + 28)
+            path.lineTo(x0 + 50,  y0 + 22)
+            path.lineTo(x0 + 106, y0 + 22)
+            path.lineTo(x0 + 126, y0 + 28)
+            path.bezierCurveTo(x0 + 138, y0 + 30, x0 + 150, y0 + 36, x0 + 152, y0 + 56)
+            path.closePath()
     }
 
-    // wheels (cream-on-black tire style)
-    let wheelL = 28, wheelR = 122
-    if(model.shape === 'micro')   { wheelL = 46; wheelR = 110 }
-    if(model.shape === 'classic') { wheelL = 32; wheelR = 118 }
+    // ── Roof dome (classic + sedan get a separate raised roof) ─────────────
+    if(model.shape === 'classic')
+    {
+        const roof = new Path2D()
+        roof.moveTo(x0 + 38, y0 + 32)
+        roof.bezierCurveTo(x0 + 46, y0 + 10, x0 + 110, y0 + 10, x0 + 118, y0 + 32)
+        roof.closePath()
+        ctx.fillStyle = bodyGrad
+        ctx.fill(roof)
+    }
+
+    // ── Body fill + outline ────────────────────────────────────────────────
+    ctx.fillStyle = bodyGrad
+    ctx.fill(path)
+    ctx.strokeStyle = stroke
+    ctx.lineWidth = 2
+    ctx.stroke(path)
+
+    // ── Top sheen (10% bright stripe along upper body) ─────────────────────
+    ctx.save()
+    ctx.clip(path)
+    const sheen = ctx.createLinearGradient(0, y0 + 16, 0, y0 + 32)
+    sheen.addColorStop(0,   'rgba(255,255,255,0.35)')
+    sheen.addColorStop(1,   'rgba(255,255,255,0)')
+    ctx.fillStyle = sheen
+    ctx.fillRect(x0, y0 + 14, carW, 22)
+    ctx.restore()
+
+    // ── Rocker shadow (dark band at bottom) ────────────────────────────────
+    ctx.save()
+    ctx.clip(path)
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    ctx.fillRect(x0, y0 + 52, carW, 8)
+    ctx.restore()
+
+    // ── Accent stripe / trim ───────────────────────────────────────────────
+    ctx.save()
+    ctx.clip(path)
+    ctx.fillStyle = acc
+    ctx.fillRect(x0 + 6, y0 + 48, carW - 12, 4)
+    ctx.restore()
+
+    // ── Door cut lines (just suggest panels) ───────────────────────────────
+    ctx.save()
+    ctx.clip(path)
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+    ctx.lineWidth = 0.8
+    ctx.beginPath()
+    ctx.moveTo(x0 + carW * 0.55, y0 + 28)
+    ctx.lineTo(x0 + carW * 0.55, y0 + 56)
+    ctx.stroke()
+    if(model.shape === 'wagon' || model.shape === 'truck')
+    {
+        ctx.beginPath()
+        ctx.moveTo(x0 + carW * 0.32, y0 + 24)
+        ctx.lineTo(x0 + carW * 0.32, y0 + 56)
+        ctx.stroke()
+    }
+    ctx.restore()
+
+    // ── Window glass — per-shape rectangles + reflection diagonal ──────────
+    const drawWindow = (wx, wy, ww, wh, radius = 4) =>
+    {
+        ctx.save()
+        ctx.fillStyle = win
+        roundRect(ctx, wx, wy, ww, wh, radius); ctx.fill()
+        // dark frame
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        // reflection stripe
+        ctx.beginPath()
+        ctx.moveTo(wx + 4,       wy + wh - 2)
+        ctx.lineTo(wx + ww * 0.45, wy + 2)
+        ctx.lineTo(wx + ww * 0.55, wy + 2)
+        ctx.lineTo(wx + 14,      wy + wh - 2)
+        ctx.closePath()
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'
+        ctx.fill()
+        ctx.restore()
+    }
+
+    switch(model.shape)
+    {
+        case 'pickup':
+            drawWindow(x0 + 14, y0 + 22, 50, 14, 3)
+            break
+        case 'sports':
+            drawWindow(x0 + 36, y0 + 26, 64, 12, 5)
+            break
+        case 'truck':
+            drawWindow(x0 + 8,  y0 + 18, 42, 16, 3)
+            break
+        case 'wagon':
+            drawWindow(x0 + 24, y0 + 24, 102, 16, 3)
+            // pillar
+            ctx.fillStyle = stroke
+            ctx.fillRect(x0 + 80, y0 + 24, 3, 16)
+            break
+        case 'classic':
+            drawWindow(x0 + 46, y0 + 14, 66, 18, 8)
+            break
+        case 'micro':
+            drawWindow(x0 + 44, y0 + 22, 76, 18, 8)
+            // canvas roof seam
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'
+            ctx.fillRect(x0 + 80, y0 + 22, 2, 22)
+            break
+        default:
+            drawWindow(x0 + 30, y0 + 24, 86, 16, 4)
+    }
+
+    // ── Chrome bumpers ──────────────────────────────────────────────────────
+    const chromeGrad = ctx.createLinearGradient(0, y0 + 50, 0, y0 + 60)
+    chromeGrad.addColorStop(0,   '#fafafa')
+    chromeGrad.addColorStop(0.5, '#aaaaaa')
+    chromeGrad.addColorStop(1,   '#5a5a5a')
+    // front bumper
+    ctx.fillStyle = chromeGrad
+    roundRect(ctx, x0 + carW - 16, y0 + 52, 12, 6, 2); ctx.fill()
+    // rear bumper
+    roundRect(ctx, x0 + 4, y0 + 52, 12, 6, 2); ctx.fill()
+
+    // ── Front grille (slats) ───────────────────────────────────────────────
+    ctx.save()
+    ctx.fillStyle = '#1a1a1a'
+    roundRect(ctx, x0 + carW - 22, y0 + 38, 14, 14, 2); ctx.fill()
+    ctx.strokeStyle = '#9a9a9a'
+    ctx.lineWidth = 0.8
+    for(let i = 0; i < 4; i++)
+    {
+        ctx.beginPath()
+        ctx.moveTo(x0 + carW - 21, y0 + 40 + i * 3)
+        ctx.lineTo(x0 + carW - 9,  y0 + 40 + i * 3)
+        ctx.stroke()
+    }
+    ctx.restore()
+
+    // ── Headlights ──────────────────────────────────────────────────────────
+    const drawHeadlamp = (hx, hy) =>
+    {
+        // halo
+        const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 7)
+        glow.addColorStop(0,   'rgba(255,245,194,0.95)')
+        glow.addColorStop(1,   'rgba(255,245,194,0)')
+        ctx.fillStyle = glow
+        ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI * 2); ctx.fill()
+        // lens
+        ctx.fillStyle = '#fff5c2'
+        ctx.strokeStyle = '#1a1a1a'
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(hx, hy, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
+        // highlight
+        ctx.fillStyle = '#ffffff'
+        ctx.beginPath(); ctx.arc(hx - 1, hy - 1, 0.9, 0, Math.PI * 2); ctx.fill()
+    }
+    drawHeadlamp(x0 + carW - 8, y0 + 42)
+    if(model.shape !== 'classic') drawHeadlamp(x0 + carW - 8, y0 + 46)
+
+    // ── Side mirrors ────────────────────────────────────────────────────────
+    ctx.fillStyle = stroke
+    ctx.fillRect(x0 + carW - 26, y0 + 28, 3, 4)
+
+    // ── Door handles ────────────────────────────────────────────────────────
+    ctx.fillStyle = '#cfd1d4'
+    ctx.fillRect(x0 + 36, y0 + 42, 6, 2)
+    ctx.fillRect(x0 + 96, y0 + 42, 6, 2)
+
+    // ── Roof rack (pickup, truck, wagon) ───────────────────────────────────
+    if(model.shape === 'pickup' || model.shape === 'truck' || model.shape === 'wagon')
+    {
+        ctx.fillStyle = stroke
+        const rackY = y0 + 14
+        const rackX = model.shape === 'truck' ? x0 + 8 : x0 + 16
+        const rackW = model.shape === 'truck' ? 44 : (model.shape === 'wagon' ? 110 : 56)
+        ctx.fillRect(rackX, rackY, rackW, 3)
+        // 4 light bars
+        ctx.fillStyle = '#f0c14b'
+        ctx.strokeStyle = stroke
+        ctx.lineWidth = 1
+        for(let i = 0; i < 4; i++)
+        {
+            const lx = rackX + 4 + i * (rackW - 12) / 3
+            ctx.fillRect(lx, rackY - 4, 6, 5)
+            ctx.strokeRect(lx, rackY - 4, 6, 5)
+        }
+    }
+
+    // ── Antenna (pickup only) ──────────────────────────────────────────────
+    if(model.shape === 'pickup')
+    {
+        ctx.strokeStyle = stroke
+        ctx.lineWidth = 1.4
+        ctx.beginPath()
+        ctx.moveTo(x0 + 70, y0 + 22)
+        ctx.lineTo(x0 + 78, y0 + 4)
+        ctx.stroke()
+        ctx.fillStyle = '#f0c14b'
+        ctx.beginPath(); ctx.arc(x0 + 78, y0 + 4, 2.2, 0, Math.PI * 2); ctx.fill()
+    }
+
+    // ── Wheels: alloy with 5 spokes + tire + arch shadow ───────────────────
+    let wheelL = 30, wheelR = 124
+    if(model.shape === 'micro')   { wheelL = 50; wheelR = 108 }
+    if(model.shape === 'classic') { wheelL = 36; wheelR = 122 }
+    if(model.shape === 'truck')   { wheelL = 26; wheelR = 128 }
+
     for(const wx of [wheelL, wheelR])
     {
+        const cxw = x0 + wx, cyw = y0 + 60
+        // arch shadow (under fender)
+        ctx.fillStyle = 'rgba(0,0,0,0.4)'
+        ctx.beginPath(); ctx.arc(cxw, cyw - 4, 14, Math.PI, Math.PI * 2); ctx.fill()
+        // tire
+        ctx.fillStyle = '#15110a'
+        ctx.beginPath(); ctx.arc(cxw, cyw, 12, 0, Math.PI * 2); ctx.fill()
+        // tread highlight ring
+        ctx.strokeStyle = '#3a2a18'
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(cxw, cyw, 10.5, 0, Math.PI * 2); ctx.stroke()
+        // alloy hub
+        const hubGrad = ctx.createRadialGradient(cxw - 2, cyw - 2, 0, cxw, cyw, 7)
+        hubGrad.addColorStop(0,   '#e0e2e6')
+        hubGrad.addColorStop(0.7, '#8b8e92')
+        hubGrad.addColorStop(1,   '#3a3d40')
+        ctx.fillStyle = hubGrad
+        ctx.beginPath(); ctx.arc(cxw, cyw, 7, 0, Math.PI * 2); ctx.fill()
+        // 5-spoke star
+        ctx.strokeStyle = '#15110a'
+        ctx.lineWidth = 1.2
+        for(let i = 0; i < 5; i++)
+        {
+            const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+            ctx.beginPath()
+            ctx.moveTo(cxw, cyw)
+            ctx.lineTo(cxw + Math.cos(a) * 6, cyw + Math.sin(a) * 6)
+            ctx.stroke()
+        }
+        // center cap
         ctx.fillStyle = '#1a1a1a'
-        ctx.beginPath(); ctx.arc(x0 + wx, y0 + 58, 11, 0, Math.PI * 2); ctx.fill()
-        ctx.fillStyle = '#f7ecd2'
-        ctx.beginPath(); ctx.arc(x0 + wx, y0 + 58, 5,  0, Math.PI * 2); ctx.fill()
+        ctx.beginPath(); ctx.arc(cxw, cyw, 2, 0, Math.PI * 2); ctx.fill()
     }
 
-    // headlight
-    ctx.fillStyle = '#fff5c2'
-    ctx.beginPath(); ctx.arc(x0 + carW - 6, y0 + 44, 3, 0, Math.PI * 2); ctx.fill()
     ctx.restore()
 }
 
