@@ -34,6 +34,9 @@ import CollectPickups from './CollectPickups.js'
 import CollectHUD from './CollectHUD.js'
 import MatchTimer from './MatchTimer.js'
 import Confetti from './Confetti.js'
+import AudioFX from './AudioFX.js'
+import TutorialOverlay from './TutorialOverlay.js'
+import MudPuddles from './MudPuddles.js'
 import { CAR_COLORS } from '../../../../shared/constants.js'
 
 function escapeHtml(s)
@@ -182,11 +185,22 @@ export default class World
             collectPickups: this.collectPickups,
         })
 
+        // Procedural SFX
+        this.audioFX = new AudioFX()
+        this._lastCountdownTick = null
+        this._lastTimerWarn     = null
+
         // Match timer HUD (top-center) + pre-match countdown overlay
         this.matchTimer = new MatchTimer({ network: this.network })
 
         // Confetti emitter (canvas-based)
         this.confetti = new Confetti()
+
+        // First-time tutorial (no-op if already seen)
+        new TutorialOverlay()
+
+        // Mud puddles — visual + per-tick friction modifier
+        this.mudPuddles = new MudPuddles({ scene: this.scene, physics: this.physics })
 
         // Track my collected count for HUD
         this._myCollects = 0
@@ -198,6 +212,7 @@ export default class World
                 {
                     this._myCollects = score
                     this._flashCollect('+1', '#f0c14b')
+                    this.audioFX?.collectChime(score - 1)
                     if(completed) this._triggerFinaleMoment()
                 }
                 else
@@ -226,6 +241,9 @@ export default class World
             this.collectHUD?.updateMinimap()
             this.matchTimer?.update()
             this._updateCollectTimer()
+            this._audioTick()
+            this._collectIntroTick()
+            this.mudPuddles?.update()
 
             // Block inputs during pre-match countdown so cars don't drive off
             if(this.matchTimer?.isCountdown?.() && this.controls)
@@ -329,10 +347,95 @@ export default class World
 
     // Slow-mo + bloom flash + confetti when the local player grabs car #10.
     // Plays ~900ms before the server's collect:finished arrives.
+    // Pre-match cinematic: camera fly-by during early countdown, then Jeep
+    // drop-in (raise car to z=22 + wake physics) ~1.2s before GO.
+    _collectIntroTick()
+    {
+        if(!this.matchTimer) return
+        const start = this.matchTimer.matchStartAt
+        if(start === null) return
+        const now = this.network?.serverNow?.() ?? Date.now()
+        const toStart = start - now
+        const body = this.physics?.car?.chassis?.body
+        const $car = this.car?.chassis?.object
+
+        // Enter fly-by + hide car at countdown start
+        if(toStart > 1200 && !this._introPrepared)
+        {
+            this._introPrepared = true
+            this._cameraFlyby = true
+            this._cameraFlybyStart = Date.now()
+            if($car) $car.visible = false
+            if(body) body.sleep()
+        }
+        // Drop the Jeep in ~1.2s before GO
+        else if(toStart > 0 && toStart <= 1200 && !this._introDropped)
+        {
+            this._introDropped = true
+            if($car) $car.visible = true
+            if(body)
+            {
+                const spawn = this._serverSpawnPos || { x: 0, y: -35 }
+                body.position.set(spawn.x, spawn.y, 22)
+                body.velocity.set(0, 0, 0)
+                body.angularVelocity.set(0, 0, 0)
+                body.quaternion.set(0, 0, 0, 1)
+                body.wakeUp()
+            }
+        }
+        // End fly-by at GO
+        else if(toStart <= 0 && this._cameraFlyby)
+        {
+            this._cameraFlyby = false
+        }
+    }
+
+    // Drive countdown beeps + timer warning ticks from MatchTimer state.
+    _audioTick()
+    {
+        if(!this.audioFX || !this.matchTimer) return
+        const start = this.matchTimer.matchStartAt
+        const end   = this.matchTimer.matchEndAt
+        if(start === null) return
+        const now = this.network?.serverNow?.() ?? Date.now()
+
+        // Countdown beeps — fire once per integer second remaining (3, 2, 1, GO)
+        const toStart = start - now
+        if(toStart > 0)
+        {
+            const sec = Math.ceil(toStart / 1000)   // 3 → 2 → 1
+            if(sec !== this._lastCountdownTick && sec >= 1 && sec <= 3)
+            {
+                this._lastCountdownTick = sec
+                this.audioFX.countdownBeep(sec)
+            }
+        }
+        else if(this._lastCountdownTick !== 'go')
+        {
+            this._lastCountdownTick = 'go'
+            this.audioFX.countdownGo()
+        }
+
+        // Timer warning ticks — last 10s, urgent under 3s
+        const toEnd = end - now
+        if(toEnd > 0 && toEnd <= 10_000)
+        {
+            const sec = Math.ceil(toEnd / 1000)
+            if(sec !== this._lastTimerWarn)
+            {
+                this._lastTimerWarn = sec
+                this.audioFX.timerTick(sec <= 3)
+            }
+        }
+    }
+
     _triggerFinaleMoment()
     {
         if(this._finaleTriggered) return
         this._finaleTriggered = true
+
+        // 0. Triumphant fanfare
+        this.audioFX?.fanfare()
 
         // 1. Confetti burst from screen center
         if(this.confetti) this.confetti.burst({ count: 280 })
@@ -1114,8 +1217,19 @@ export default class World
             lx += (txTarget - lx) * LOOK_EASE
             ly += (tyTarget - ly) * LOOK_EASE
 
-            this.camera.target.x = lx
-            this.camera.target.y = ly
+            // Override: during pre-match fly-by, sweep camera around arena center
+            if(this._cameraFlyby)
+            {
+                const t = (Date.now() - this._cameraFlybyStart) * 0.001
+                const r = 12   // orbit radius
+                this.camera.target.x = Math.cos(t * 1.4) * r
+                this.camera.target.y = Math.sin(t * 1.4) * r
+            }
+            else
+            {
+                this.camera.target.x = lx
+                this.camera.target.y = ly
+            }
         })
     }
 

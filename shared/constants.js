@@ -138,6 +138,16 @@ export const COLLECT = {
   targetCount:      10,
   pickupRadius:     2.6,      // m — proximity for auto-collect
   pickupHeightZ:    1.0,      // float a meter above ground
+  // Mud puddles — flat brown patches that drag the car when driven through.
+  // Each has (x, y) center, radius in meters, and a drag factor (lower = slower).
+  mudPuddles: [
+    { x:  20, y:   8, r: 4.5, drag: 0.65 },
+    { x: -16, y: -14, r: 5.0, drag: 0.55 },
+    { x:  -8, y:  22, r: 3.8, drag: 0.7  },
+    { x:  18, y: -22, r: 4.2, drag: 0.6  },
+    { x: -22, y:  -2, r: 4.0, drag: 0.6  },
+  ],
+
   // 10 fixed positions, each paired with a distinct car model key. Spread
   // across cardinal quadrants + plateau + ramps to force movement.
   positions: [
