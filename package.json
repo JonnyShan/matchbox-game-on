@@ -1,19 +1,20 @@
 {
-  "name": "redline",
+  "name": "matchbox-game-on",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "REDLINE — multiplayer 3D arcade racer with vehicular combat. Three.js + Cannon.js + Socket.IO.",
-  "homepage": "https://redline.victorgalvez.dev",
+  "description": "MATCHBOX GAME ON — collect 10 die-cast cars in 60 seconds. Three.js + Cannon.js + Socket.IO.",
+  "homepage": "https://github.com/JonnyShan/matchbox-game-on",
   "repository": {
     "type": "git",
-    "url": "https://github.com/victorgalvez56/racing-game.git"
+    "url": "https://github.com/JonnyShan/matchbox-game-on.git"
   },
   "license": "MIT",
-  "author": "Victor Galvez <hello@victorgalvez.dev>",
+  "author": "Jonny Shannon",
   "scripts": {
     "dev": "concurrently --names \"client,server\" --prefix-colors \"cyan,yellow\" \"npm run dev --prefix client\" \"cd server && node src/index.js\"",
-    "build": "npm run build --prefix client",
+    "build": "npm install --prefix client && npm install --prefix server && npm run build --prefix client",
+    "start": "node server/src/index.js",
     "server": "npm run dev --prefix server",
     "client": "npm run dev --prefix client"
   },
