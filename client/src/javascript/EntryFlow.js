@@ -45,20 +45,21 @@ export default class EntryFlow
 
         // Let the Matchbox "Game On" box-art sit on screen for 4s before the
         // picker overlay drops in. Skip the wait if the player taps anything.
-        const INTRO_HOLD_MS = 4000
+        // Let the Matchbox "Game On" box-art breathe for 5 seconds before the
+        // picker overlay drops in. Skip only on keyboard input (a stray click
+        // shouldn't dismiss the hero shot).
+        const INTRO_HOLD_MS = 5000
         let opened = false
         const open = () =>
         {
             if(opened) return
             opened = true
-            document.removeEventListener('pointerdown', open)
             document.removeEventListener('keydown', open)
             clearTimeout(this._introTimer)
             this._buildPicker()
         }
         this._introTimer = setTimeout(open, INTRO_HOLD_MS)
-        document.addEventListener('pointerdown', open, { once: true })
-        document.addEventListener('keydown',     open, { once: true })
+        document.addEventListener('keydown', open, { once: true })
     }
 
     _buildPicker()
