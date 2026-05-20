@@ -43,7 +43,22 @@ export default class EntryFlow
         if(this._selectedBody < 0) this._selectedBody = 0
         this.config.carType = BODY_SHAPES[this._selectedBody].type
 
-        this._buildPicker()
+        // Let the Matchbox "Game On" box-art sit on screen for 4s before the
+        // picker overlay drops in. Skip the wait if the player taps anything.
+        const INTRO_HOLD_MS = 4000
+        let opened = false
+        const open = () =>
+        {
+            if(opened) return
+            opened = true
+            document.removeEventListener('pointerdown', open)
+            document.removeEventListener('keydown', open)
+            clearTimeout(this._introTimer)
+            this._buildPicker()
+        }
+        this._introTimer = setTimeout(open, INTRO_HOLD_MS)
+        document.addEventListener('pointerdown', open, { once: true })
+        document.addEventListener('keydown',     open, { once: true })
     }
 
     _buildPicker()
