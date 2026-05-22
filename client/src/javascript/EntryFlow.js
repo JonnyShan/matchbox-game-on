@@ -45,21 +45,43 @@ export default class EntryFlow
 
         // Let the Matchbox "Game On" box-art sit on screen for 4s before the
         // picker overlay drops in. Skip the wait if the player taps anything.
-        // Let the Matchbox "Game On" box-art breathe for 5 seconds before the
-        // picker overlay drops in. Skip only on keyboard input (a stray click
-        // shouldn't dismiss the hero shot).
-        const INTRO_HOLD_MS = 5000
+        // Box-art sits indefinitely. Picker only opens on explicit user input
+        // (any key OR clicking the on-screen prompt). No auto-timeout.
+        this._showStartPrompt()
+    }
+
+    _showStartPrompt()
+    {
+        const $prompt = document.createElement('button')
+        $prompt.type = 'button'
+        $prompt.id = 'mb-start-prompt'
+        $prompt.innerHTML = `
+            <span>PRESS ANY KEY</span>
+            <span class="mb-start-prompt-sub">or tap to start</span>
+        `
+        document.body.appendChild($prompt)
+        this._$startPrompt = $prompt
+
         let opened = false
         const open = () =>
         {
             if(opened) return
             opened = true
-            document.removeEventListener('keydown', open)
-            clearTimeout(this._introTimer)
+            document.removeEventListener('keydown', onKey)
+            $prompt.removeEventListener('click', open)
+            $prompt.style.transition = 'opacity 0.25s'
+            $prompt.style.opacity = '0'
+            setTimeout(() => $prompt.remove(), 280)
             this._buildPicker()
         }
-        this._introTimer = setTimeout(open, INTRO_HOLD_MS)
-        document.addEventListener('keydown', open, { once: true })
+        const onKey = (e) =>
+        {
+            // Ignore modifier-only keys
+            if(e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') return
+            open()
+        }
+        document.addEventListener('keydown', onKey)
+        $prompt.addEventListener('click', open)
     }
 
     _buildPicker()
